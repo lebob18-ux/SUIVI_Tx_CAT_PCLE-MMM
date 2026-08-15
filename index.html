@@ -89,7 +89,7 @@
 
     </div>
 
-    <!-- Modale pour demander le RJ lors d'une action de partage/copie sur la Page 1 -->
+    <!-- Modale pour demander le RJ lors d'une action de partage sur la Page 1 -->
     <div id="divRJModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div class="bg-white p-6 rounded-xl shadow-lg w-85 max-w-sm text-center">
             <p class="font-bold text-lg mb-2 text-gray-800">🌙 Numéro RJ requis</p>
@@ -120,7 +120,7 @@
         let rawData = [];
         let sessionRJ = "";
         let userName = localStorage.getItem('nomSutx') || "";
-        let actionEnCours = null; // 'pdf' ou 'copier'
+        let actionEnCours = null;
 
         window.addEventListener('DOMContentLoaded', () => {
             if ('serviceWorker' in navigator) {
@@ -298,13 +298,14 @@
             rafraichirAffichageTaches();
         }
 
-        // Déclencheurs pour demander le RJ avant action
         document.getElementById('btnSharePDF').addEventListener('click', () => {
             verifierModificationsEtDemanderRJ('pdf');
         });
 
         function copierTravaux() {
-            verifierModificationsEtDemanderRJ('copier');
+            // Pour la copie, pas besoin de demander le RJ puisque le RJ n'est plus inclus dans le texte récap.
+            // On peut copier directement les modifications de la session.
+            copierDansPressePapier();
         }
 
         function verifierModificationsEtDemanderRJ(typeAction) {
@@ -320,9 +321,8 @@
             document.getElementById('divRJModal').classList.remove('hidden');
         }
 
-        // Validation de la modale RJ et aiguillage vers la génération PDF ou la Copie
         function executerActionEnAttente() {
-            const saisiRJ = document.getElementById('rjInput').value.trim();
+            const saisiRJ = document.getElementById('rjInput'].value.trim();
             if (!saisiRJ) {
                 alert("Veuillez entrer un numéro RJ valide.");
                 return;
@@ -333,26 +333,42 @@
 
             if (actionEnCours === 'pdf') {
                 genererEtPartagerPDF();
-            } else if (actionEnCours === 'copier') {
-                copierDansPressePapier();
             }
         }
 
-        // Copie formatée dans le presse-papiers
+        // Copie optimisée : uniquement Support et Tâches faites (modifiées/cochées à Vrai)
         async function copierDansPressePapier() {
-            const elementsModifies = rawData.filter(r => r.modifie === true);
-            let texteFinal = `RAPPORT DE SUIVI - TRAVAUX\n`;
-            texteFinal += `Opérateur SUTX : ${userName} | Numéro RJ : ${sessionRJ} | Date : ${new Date().toLocaleString()}\n\n`;
-            texteFinal += `ID\tChantier\tSupport\tTâche\tFait\tObservation\n`;
+            // On filtre les éléments modifiés qui sont cochés comme "Vrais" (faits)
+            const elementsFaites = rawData.filter(r => r.modifie === true && ['vrai', 'true', '1'].includes(String(r.Fait).toLowerCase().trim()));
 
-            elementsModifies.forEach(r => {
-                const idVal = r.ID || "SANS ID";
-                texteFinal += `${idVal}\t${r.Chantier}\t${r.Support}\t${r.Tache}\t${r.Fait}\t${r.Observation || ""}\n`;
+            if (elementsFaites.length === 0) {
+                alert("Aucun travail validé (coché fait) n'a été trouvé pour la copie.");
+                return;
+            }
+
+            // Grouper par Support pour un affichage propre et lisible
+            const supportsGrouper = {};
+            elementsFaites.forEach(r => {
+                const support = r.Support || "Support inconnu";
+                if (!supportsGrouper[support]) {
+                    supportsGrouper[support] = [];
+                }
+                supportsGrouper[support].push(r.Tache);
             });
 
+            // Construction du texte récapitulatif
+            let texteFinal = "";
+            for (const [support, taches] of Object.entries(supportsGrouper)) {
+                texteFinal += `Support : ${support}\n`;
+                taches.forEach(tache => {
+                    texteFinal += `- ${tache}\n`;
+                });
+                texteFinal += `\n`;
+            }
+
             try {
-                await navigator.clipboard.writeText(texteFinal);
-                alert("✅ Les travaux modifiés ont été copiés dans le presse-papiers ! Vous pouvez les coller (Ctrl+V).");
+                await navigator.clipboard.writeText(texteFinal.trim());
+                alert("✅ Récapitulatif copié dans le presse-papiers !\n\nVous pouvez le coller (Ctrl+V) dans votre autre application.");
             } catch (err) {
                 console.error("Erreur de copie : ", err);
                 alert("Erreur lors de la copie automatique.");
@@ -405,7 +421,7 @@
                     await navigator.share({
                         files: [file],
                         title: 'Rapport Suivi Travaux',
-                        text: `Modifications RJ ${sessionRJ} - ${userName}`
+                        text: `Bonjour, voici le rapport de suivi des travaux pour le RJ ${sessionRJ}.\nOpérateur : ${userName}`
                     });
                     return;
                 }
@@ -458,7 +474,7 @@
                     await navigator.share({
                         files: [file],
                         title: 'Avancement Chantiers',
-                        text: `Bilan avancement chantiers - ${userName}`
+                        text: `Bonjour, voici le bilan d'avancement global des chantiers.\nOpérateur : ${userName}`
                     });
                     return;
                 }
