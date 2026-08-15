@@ -1,0 +1,5 @@
+﻿Chantier;Support;Tache;Fait;Observation
+Chantier A;Support 01;Vérification géométrie voie;True;RAS
+Chantier A;Support 01;Serrage boulons;False;À revoir
+Chantier B;Support 02;Contrôle caténaire;True;Conforme
+Chantier B;Support 03;Verification isolateur;False;
