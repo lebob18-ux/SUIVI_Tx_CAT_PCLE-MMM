@@ -75,6 +75,19 @@
 
     </div>
 
+    <!-- Modale personnalisée pour demander le RJ lors du partage sur la Page 1 -->
+    <div id="divRJModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-xl shadow-lg w-85 max-w-sm text-center">
+            <p class="font-bold text-lg mb-2 text-gray-800">🌙 Numéro RJ requis</p>
+            <p class="text-xs text-gray-600 mb-4">Veuillez indiquer le numéro RJ pour ce partage de modifications :</p>
+            <input type="text" id="rjInput" placeholder="Numéro RJ" class="w-full p-2 border rounded-lg mb-4 text-center font-bold focus:ring-2 focus:ring-blue-500">
+            <div class="flex gap-2">
+                <button onclick="validerEtPartagerPDF()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-lg font-bold text-sm">✅ Valider</button>
+                <button onclick="document.getElementById('divRJModal').classList.add('hidden')" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 p-2 rounded-lg font-bold text-sm">❌ Annuler</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let rawData = [];
         let sessionRJ = "";
@@ -89,9 +102,9 @@
                 userName = prompt("Entrez votre Nom/Prénom :") || "Inconnu";
                 localStorage.setItem('nomSutx', userName);
             }
-            sessionRJ = prompt("Entrez le Numéro RJ de ce chantier :") || "0000";
             
-            document.getElementById('headerInfo').innerText = `👤 SUTX : ${userName} | 📌 RJ : ${sessionRJ}`;
+            // Pas de demande de RJ au lancement
+            document.getElementById('headerInfo').innerText = `👤 SUTX : ${userName}`;
 
             Papa.parse("data_tx_cat.csv", {
                 download: true, header: true, delimiter: ";", skipEmptyLines: true,
@@ -220,8 +233,8 @@
             rawData[index].modifie = true;
         };
 
-        // Export PDF de la Page 1 (Modifications de session)
-        btnSharePDF.addEventListener('click', async () => {
+        // Clic sur Partager PDF (Page 1) : Ouvre le popup RJ si des modifications existent
+        btnSharePDF.addEventListener('click', () => {
             const elementsModifies = rawData.filter(r => r.modifie === true);
 
             if (elementsModifies.length === 0) {
@@ -229,6 +242,23 @@
                 return;
             }
 
+            // Ouvre la modale pour demander le RJ avant de générer
+            document.getElementById('rjInput').value = sessionRJ || "";
+            document.getElementById('divRJModal').classList.remove('hidden');
+        });
+
+        // Validation du popup RJ et génération effective du PDF de la Page 1
+        async function validerEtPartagerPDF() {
+            const saisiRJ = document.getElementById('rjInput').value.trim();
+            if (!saisiRJ) {
+                alert("Veuillez entrer un numéro RJ valide.");
+                return;
+            }
+            sessionRJ = saisiRJ;
+            document.getElementById('divRJModal').classList.add('hidden');
+            document.getElementById('headerInfo').innerText = `👤 SUTX : ${userName} | 📌 RJ : ${sessionRJ}`;
+
+            const elementsModifies = rawData.filter(r => r.modifie === true);
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
             const dateEnvoi = new Date().toLocaleString();
@@ -277,7 +307,7 @@
             }
 
             doc.save(fileName);
-        });
+        }
 
         // Export PDF de l'avancement global (Page 2)
         async function partagerPDFAvancement() {
@@ -293,7 +323,7 @@
 
             doc.setTextColor(50, 50, 50);
             doc.setFontSize(11);
-            doc.text(`Opérateur : ${userName} | RJ : ${sessionRJ}`, 14, 35);
+            doc.text(`Opérateur : ${userName}`, 14, 35);
 
             const tableColumns = ["Chantier", "Tâches Réalisées", "Total Tâches", "Avancement"];
             const tableRows = chantiers.map(chantier => {
@@ -314,7 +344,7 @@
             });
 
             const pdfOutput = doc.output('blob');
-            const fileName = `Avancement_Chantiers_RJ_${sessionRJ}.pdf`;
+            const fileName = `Avancement_Chantiers.pdf`;
             const file = new File([pdfOutput], fileName, { type: "application/pdf" });
 
             try {
@@ -322,7 +352,7 @@
                     await navigator.share({
                         files: [file],
                         title: 'Avancement Chantiers',
-                        text: `Bilan avancement chantiers - RJ ${sessionRJ}`
+                        text: `Bilan avancement chantiers - ${userName}`
                     });
                     return;
                 }
