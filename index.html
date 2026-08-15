@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Suivi Travaux Chantier</title>
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#2563eb">
+    
+    <!-- Bibliothèques externes -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen p-4">
+
+    <div class="max-w-4xl mx-auto bg-white rounded-xl shadow-md overflow-hidden p-6">
+        <h1 class="text-2xl font-bold text-gray-800 mb-6">📋 Suivi des Travaux</h1>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Chantier :</label>
+                <select id="selectChantier" class="w-full p-2.5 border border-gray-300 rounded-lg bg-gray-50"><option value="">-- Choisir --</option></select>
+            </div>
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Support :</label>
+                <select id="selectSupport" class="w-full p-2.5 border border-gray-300 rounded-lg bg-gray-50" disabled><option value="">-- Choisir --</option></select>
+            </div>
+        </div>
+
+        <div id="containerTaches" class="hidden">
+            <div id="listeTaches" class="space-y-4 mb-6"></div>
+            <button id="btnExport" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-lg shadow-lg">
+                📥 Exporter en Excel (.xlsx)
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let rawData = [];
+
+        window.addEventListener('DOMContentLoaded', () => {
+            // Enregistrement Service Worker pour PWA
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('sw.js').catch(console.error);
+            }
+
+            Papa.parse("data.csv", {
+                download: true, header: true, delimiter: ";", skipEmptyLines: true,
+                complete: (results) => { 
+                    rawData = results.data; 
+                    const chantiers = [...new Set(rawData.map(r => r.Chantier))].filter(Boolean);
+                    chantiers.forEach(c => selectChantier.add(new Option(c, c)));
+                }
+            });
+        });
+
+        const selectChantier = document.getElementById('selectChantier');
+        const selectSupport = document.getElementById('selectSupport');
+
+        selectChantier.addEventListener('change', () => {
+            selectSupport.innerHTML = '<option value="">-- Choisir --</option>';
+            const supports = [...new Set(rawData.filter(r => r.Chantier === selectChantier.value).map(r => r.Support))].filter(Boolean);
+            supports.forEach(s => selectSupport.add(new Option(s, s)));
+            selectSupport.disabled = !selectChantier.value;
+            document.getElementById('containerTaches').classList.add('hidden');
+        });
+
+        selectSupport.addEventListener('change', () => {
+            const list = document.getElementById('listeTaches');
+            list.innerHTML = '';
+            rawData.filter(r => r.Chantier === selectChantier.value && r.Support === selectSupport.value).forEach((item, idx) => {
+                const isChecked = String(item.Fait).toLowerCase() === 'vrai' || item.Fait == '1';
+                list.innerHTML += `
+                    <div class="p-4 bg-gray-50 rounded-lg flex items-center gap-4">
+                        <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="rawData[${rawData.indexOf(item)}].Fait = this.checked ? 'Vrai' : 'Faux'" class="w-6 h-6">
+                        <div class="flex-1">
+                            <div class="font-bold">${item.Tache}</div>
+                            <input type="text" value="${item.Observation || ''}" oninput="rawData[${rawData.indexOf(item)}].Observation = this.value" placeholder="Observation..." class="w-full mt-1 p-1 border rounded">
+                        </div>
+                    </div>`;
+            });
+            document.getElementById('containerTaches').classList.remove('hidden');
+        });
+
+        document.getElementById('btnExport').addEventListener('click', () => {
+            XLSX.writeFile(XLSX.utils.book_new().appendChild(XLSX.utils.json_to_sheet(rawData)), "Suivi_Travaux.xlsx");
+        });
+    </script>
+</body>
+</html>
