@@ -31,12 +31,17 @@
 
         <!-- ================= PAGE 1 : SAISIE ================= -->
         <div id="page1">
-            <!-- En-tête : Titre et Bouton Partager PDF -->
-            <div class="flex justify-between items-center mb-2 border-b pb-4">
+            <!-- En-tête : Titre et Boutons d'action (Partager PDF & Copier) -->
+            <div class="flex flex-wrap justify-between items-center mb-2 border-b pb-4 gap-2">
                 <h1 class="text-xl font-bold text-gray-800">📋 Suivi des Travaux</h1>
-                <button id="btnSharePDF" class="hidden bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold shadow transition flex items-center gap-2">
-                    <span>📄</span> Partager PDF
-                </button>
+                <div id="containerActions" class="hidden flex gap-2">
+                    <button id="btnCopier" onclick="copierTravaux()" class="bg-gray-800 hover:bg-gray-900 text-white px-3 py-2 rounded-lg font-bold text-sm shadow transition flex items-center gap-1.5">
+                        <span>📋</span> Copier
+                    </button>
+                    <button id="btnSharePDF" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg font-bold text-sm shadow transition flex items-center gap-1.5">
+                        <span>📄</span> Partager PDF
+                    </button>
+                </div>
             </div>
             
             <div id="headerInfo" class="text-sm text-blue-700 mb-6 font-semibold bg-blue-50 p-2.5 rounded-lg border border-blue-100"></div>
@@ -84,14 +89,14 @@
 
     </div>
 
-    <!-- Modale pour demander le RJ lors du partage sur la Page 1 -->
+    <!-- Modale pour demander le RJ lors d'une action de partage/copie sur la Page 1 -->
     <div id="divRJModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div class="bg-white p-6 rounded-xl shadow-lg w-85 max-w-sm text-center">
             <p class="font-bold text-lg mb-2 text-gray-800">🌙 Numéro RJ requis</p>
-            <p class="text-xs text-gray-600 mb-4">Veuillez indiquer le numéro RJ pour ce partage de modifications :</p>
+            <p class="text-xs text-gray-600 mb-4">Veuillez indiquer le numéro RJ pour valider cette action :</p>
             <input type="text" id="rjInput" placeholder="Numéro RJ" class="w-full p-2 border rounded-lg mb-4 text-center font-bold focus:ring-2 focus:ring-blue-500">
             <div class="flex gap-2">
-                <button onclick="validerEtPartagerPDF()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-lg font-bold text-sm">✅ Valider</button>
+                <button onclick="executerActionEnAttente()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-lg font-bold text-sm">✅ Valider</button>
                 <button onclick="document.getElementById('divRJModal').classList.add('hidden')" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 p-2 rounded-lg font-bold text-sm">❌ Annuler</button>
             </div>
         </div>
@@ -115,6 +120,7 @@
         let rawData = [];
         let sessionRJ = "";
         let userName = localStorage.getItem('nomSutx') || "";
+        let actionEnCours = null; // 'pdf' ou 'copier'
 
         window.addEventListener('DOMContentLoaded', () => {
             if ('serviceWorker' in navigator) {
@@ -199,7 +205,7 @@
         const selectSupport = document.getElementById('selectSupport');
         const containerTaches = document.getElementById('containerTaches');
         const sectionTachesSupport = document.getElementById('sectionTachesSupport');
-        const btnSharePDF = document.getElementById('btnSharePDF');
+        const containerActions = document.getElementById('containerActions');
 
         selectChantier.addEventListener('change', () => {
             selectSupport.innerHTML = '<option value="">Choisir...</option>';
@@ -226,7 +232,7 @@
 
             if (!supportChoisi) {
                 sectionTachesSupport.classList.add('hidden');
-                btnSharePDF.classList.add('hidden');
+                containerActions.classList.add('hidden');
                 return;
             }
 
@@ -253,7 +259,7 @@
             });
 
             sectionTachesSupport.classList.remove('hidden');
-            btnSharePDF.classList.remove('hidden');
+            containerActions.classList.remove('hidden');
         }
 
         window.modifierLigne = function(index, champ, valeur) {
@@ -276,7 +282,6 @@
                 return;
             }
 
-            // Création de la ligne personnalisée sans ID (ID vide ou null)
             const nouvelleLigne = {
                 ID: "", 
                 Chantier: chantierChoisi,
@@ -293,7 +298,16 @@
             rafraichirAffichageTaches();
         }
 
-        btnSharePDF.addEventListener('click', () => {
+        // Déclencheurs pour demander le RJ avant action
+        document.getElementById('btnSharePDF').addEventListener('click', () => {
+            verifierModificationsEtDemanderRJ('pdf');
+        });
+
+        function copierTravaux() {
+            verifierModificationsEtDemanderRJ('copier');
+        }
+
+        function verifierModificationsEtDemanderRJ(typeAction) {
             const elementsModifies = rawData.filter(r => r.modifie === true);
 
             if (elementsModifies.length === 0) {
@@ -301,11 +315,13 @@
                 return;
             }
 
+            actionEnCours = typeAction;
             document.getElementById('rjInput').value = sessionRJ || "";
             document.getElementById('divRJModal').classList.remove('hidden');
-        });
+        }
 
-        async function validerEtPartagerPDF() {
+        // Validation de la modale RJ et aiguillage vers la génération PDF ou la Copie
+        function executerActionEnAttente() {
             const saisiRJ = document.getElementById('rjInput').value.trim();
             if (!saisiRJ) {
                 alert("Veuillez entrer un numéro RJ valide.");
@@ -315,6 +331,35 @@
             document.getElementById('divRJModal').classList.add('hidden');
             document.getElementById('headerInfo').innerText = `👤 SUTX : ${userName} | 📌 RJ : ${sessionRJ}`;
 
+            if (actionEnCours === 'pdf') {
+                genererEtPartagerPDF();
+            } else if (actionEnCours === 'copier') {
+                copierDansPressePapier();
+            }
+        }
+
+        // Copie formatée dans le presse-papiers
+        async function copierDansPressePapier() {
+            const elementsModifies = rawData.filter(r => r.modifie === true);
+            let texteFinal = `RAPPORT DE SUIVI - TRAVAUX\n`;
+            texteFinal += `Opérateur SUTX : ${userName} | Numéro RJ : ${sessionRJ} | Date : ${new Date().toLocaleString()}\n\n`;
+            texteFinal += `ID\tChantier\tSupport\tTâche\tFait\tObservation\n`;
+
+            elementsModifies.forEach(r => {
+                const idVal = r.ID || "SANS ID";
+                texteFinal += `${idVal}\t${r.Chantier}\t${r.Support}\t${r.Tache}\t${r.Fait}\t${r.Observation || ""}\n`;
+            });
+
+            try {
+                await navigator.clipboard.writeText(texteFinal);
+                alert("✅ Les travaux modifiés ont été copiés dans le presse-papiers ! Vous pouvez les coller (Ctrl+V).");
+            } catch (err) {
+                console.error("Erreur de copie : ", err);
+                alert("Erreur lors de la copie automatique.");
+            }
+        }
+
+        async function genererEtPartagerPDF() {
             const elementsModifies = rawData.filter(r => r.modifie === true);
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
@@ -345,7 +390,6 @@
                 headStyles: { fillColor: [37, 99, 235], textColor: [255, 255, 255] },
                 styles: { fontSize: 9, cellPadding: 3 },
                 didParseCell: function(data) {
-                    // Surlignage visuel dans le PDF si la ligne n'a pas d'ID (travail non prévu)
                     if (data.row.raw[0] === "SANS ID") {
                         data.cell.styles.fillColor = [254, 243, 199];
                     }
