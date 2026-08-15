@@ -57,7 +57,16 @@
                 </div>
             </div>
 
-            <div id="containerTaches" class="hidden space-y-3"></div>
+            <!-- Conteneur des tâches avec bouton d'ajout de tâche non prévue -->
+            <div id="sectionTachesSupport" class="hidden space-y-3">
+                <div class="flex justify-between items-center pt-2">
+                    <h3 class="font-bold text-sm text-gray-700">Liste des tâches :</h3>
+                    <button onclick="ouvrirModalAjoutTache()" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow transition flex items-center gap-1">
+                        <span>➕</span> Ajouter un travail non prévu
+                    </button>
+                </div>
+                <div id="containerTaches" class="space-y-3"></div>
+            </div>
         </div>
 
         <!-- ================= PAGE 2 : AVANCEMENT CHANTIERS ================= -->
@@ -75,7 +84,7 @@
 
     </div>
 
-    <!-- Modale personnalisée pour demander le RJ lors du partage sur la Page 1 -->
+    <!-- Modale pour demander le RJ lors du partage sur la Page 1 -->
     <div id="divRJModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div class="bg-white p-6 rounded-xl shadow-lg w-85 max-w-sm text-center">
             <p class="font-bold text-lg mb-2 text-gray-800">🌙 Numéro RJ requis</p>
@@ -84,6 +93,20 @@
             <div class="flex gap-2">
                 <button onclick="validerEtPartagerPDF()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-lg font-bold text-sm">✅ Valider</button>
                 <button onclick="document.getElementById('divRJModal').classList.add('hidden')" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 p-2 rounded-lg font-bold text-sm">❌ Annuler</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modale pour ajouter un travail non prévu manuellement -->
+    <div id="divAjoutTacheModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-xl shadow-lg w-90 max-w-sm">
+            <p class="font-bold text-lg mb-2 text-gray-800 text-center">➕ Ajouter un travail non prévu</p>
+            <p class="text-xs text-gray-600 mb-4 text-center">Ce travail n'aura pas d'ID (le VBA devra l'ajouter à la base globale).</p>
+            <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Intitulé de la tâche :</label>
+            <input type="text" id="inputNouvelleTache" placeholder="Ex: Reprise fondation spécifique..." class="w-full p-2.5 border rounded-lg mb-4 text-sm focus:ring-2 focus:ring-blue-500">
+            <div class="flex gap-2">
+                <button onclick="validerAjoutTacheManuelle()" class="flex-1 bg-green-600 hover:bg-green-700 text-white p-2 rounded-lg font-bold text-sm">✅ Ajouter</button>
+                <button onclick="document.getElementById('divAjoutTacheModal').classList.add('hidden')" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 p-2 rounded-lg font-bold text-sm">❌ Annuler</button>
             </div>
         </div>
     </div>
@@ -103,18 +126,16 @@
                 localStorage.setItem('nomSutx', userName);
             }
             
-            // Pas de demande de RJ au lancement
             document.getElementById('headerInfo').innerText = `👤 SUTX : ${userName}`;
 
             Papa.parse("data_tx_cat.csv", {
                 download: true, header: true, delimiter: ";", skipEmptyLines: true,
                 complete: (results) => {
-                    rawData = results.data.map(r => ({ ...r, modifie: false }));
+                    rawData = results.data.map(r => ({ ...r, modifie: false, isCustom: false }));
                     const chantiers = [...new Set(rawData.map(r => r.Chantier))].filter(Boolean);
                     const selectChantier = document.getElementById('selectChantier');
                     chantiers.forEach(c => selectChantier.add(new Option(c, c)));
 
-                    // Aiguillage automatique si le nom contient LAVIGNON
                     if (userName.toUpperCase().includes("LAVIGNON")) {
                         changerOnglet(2);
                     }
@@ -122,7 +143,6 @@
             });
         });
 
-        // Gestion de la navigation par onglets
         function changerOnglet(numPage) {
             const page1 = document.getElementById('page1');
             const page2 = document.getElementById('page2');
@@ -143,7 +163,6 @@
             }
         }
 
-        // Calcul et affichage de l'avancement par chantier (Page 2)
         function calculerEtAfficherAvancement() {
             const conteneur = document.getElementById('conteneurAvancement');
             conteneur.innerHTML = '';
@@ -179,11 +198,13 @@
         const selectChantier = document.getElementById('selectChantier');
         const selectSupport = document.getElementById('selectSupport');
         const containerTaches = document.getElementById('containerTaches');
+        const sectionTachesSupport = document.getElementById('sectionTachesSupport');
         const btnSharePDF = document.getElementById('btnSharePDF');
 
         selectChantier.addEventListener('change', () => {
             selectSupport.innerHTML = '<option value="">Choisir...</option>';
-            containerTaches.classList.add('hidden');
+            sectionTachesSupport.classList.add('hidden');
+            containerTaches.innerHTML = '';
             const chantierChoisi = selectChantier.value;
             if (!chantierChoisi) {
                 selectSupport.disabled = true;
@@ -195,12 +216,16 @@
         });
 
         selectSupport.addEventListener('change', () => {
+            rafraichirAffichageTaches();
+        });
+
+        function rafraichirAffichageTaches() {
             containerTaches.innerHTML = '';
             const chantierChoisi = selectChantier.value;
             const supportChoisi = selectSupport.value;
 
             if (!supportChoisi) {
-                containerTaches.classList.add('hidden');
+                sectionTachesSupport.classList.add('hidden');
                 btnSharePDF.classList.add('hidden');
                 return;
             }
@@ -208,32 +233,66 @@
             const lignesFiltrees = rawData.filter(r => r.Chantier === chantierChoisi && r.Support === supportChoisi);
 
             lignesFiltrees.forEach((item) => {
+                const indexGlobal = rawData.indexOf(item);
                 const isChecked = ['vrai', 'true', '1'].includes(String(item.Fait).toLowerCase().trim());
                 
                 const div = document.createElement('div');
-                div.className = "p-3 bg-gray-50 border rounded-lg flex items-center gap-3";
+                div.className = `p-3 border rounded-lg flex items-center gap-3 ${item.isCustom ? 'bg-amber-50 border-amber-200' : 'bg-gray-50'}`;
                 div.innerHTML = `
                     <input type="checkbox" ${isChecked ? 'checked' : ''} 
-                        onchange="modifierLigne(${rawData.indexOf(item)}, 'Fait', this.checked ? 'Vrai' : 'Faux')" 
+                        onchange="modifierLigne(${indexGlobal}, 'Fait', this.checked ? 'Vrai' : 'Faux')" 
                         class="w-6 h-6 text-blue-600 rounded cursor-pointer">
-                    <div class="flex-1 text-sm font-medium text-gray-800">${item.Tache}</div>
+                    <div class="flex-1 text-sm font-medium text-gray-800">
+                        ${item.Tache} ${item.isCustom ? '<span class="text-xs bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded font-bold ml-2">Hors CSV (Sans ID)</span>' : ''}
+                    </div>
                     <input type="text" value="${item.Observation || ''}" placeholder="Observation..." 
-                        oninput="modifierLigne(${rawData.indexOf(item)}, 'Observation', this.value)" 
+                        oninput="modifierLigne(${indexGlobal}, 'Observation', this.value)" 
                         class="w-1/3 p-1.5 text-sm border rounded bg-white focus:ring-2 focus:ring-blue-500">
                 `;
                 containerTaches.appendChild(div);
             });
 
-            containerTaches.classList.remove('hidden');
+            sectionTachesSupport.classList.remove('hidden');
             btnSharePDF.classList.remove('hidden');
-        });
+        }
 
         window.modifierLigne = function(index, champ, valeur) {
             rawData[index][champ] = valeur;
             rawData[index].modifie = true;
         };
 
-        // Clic sur Partager PDF (Page 1) : Ouvre le popup RJ si des modifications existent
+        function ouvrirModalAjoutTache() {
+            document.getElementById('inputNouvelleTache').value = '';
+            document.getElementById('divAjoutTacheModal').classList.remove('hidden');
+        }
+
+        function validerAjoutTacheManuelle() {
+            const intitule = document.getElementById('inputNouvelleTache').value.trim();
+            const chantierChoisi = selectChantier.value;
+            const supportChoisi = selectSupport.value;
+
+            if (!intitule) {
+                alert("Veuillez saisir un intitulé pour ce travail.");
+                return;
+            }
+
+            // Création de la ligne personnalisée sans ID (ID vide ou null)
+            const nouvelleLigne = {
+                ID: "", 
+                Chantier: chantierChoisi,
+                Support: supportChoisi,
+                Tache: intitule,
+                Fait: "Vrai",
+                Observation: "Travail non prévu ajouté manuellement",
+                modifie: true,
+                isCustom: true
+            };
+
+            rawData.push(nouvelleLigne);
+            document.getElementById('divAjoutTacheModal').classList.add('hidden');
+            rafraichirAffichageTaches();
+        }
+
         btnSharePDF.addEventListener('click', () => {
             const elementsModifies = rawData.filter(r => r.modifie === true);
 
@@ -242,12 +301,10 @@
                 return;
             }
 
-            // Ouvre la modale pour demander le RJ avant de générer
             document.getElementById('rjInput').value = sessionRJ || "";
             document.getElementById('divRJModal').classList.remove('hidden');
         });
 
-        // Validation du popup RJ et génération effective du PDF de la Page 1
         async function validerEtPartagerPDF() {
             const saisiRJ = document.getElementById('rjInput').value.trim();
             if (!saisiRJ) {
@@ -277,7 +334,7 @@
 
             const tableColumns = ["ID", "Chantier", "Support", "Tache", "Fait", "Observation"];
             const tableRows = elementsModifies.map(r => [
-                r.ID, r.Chantier, r.Support, r.Tache, r.Fait, r.Observation
+                r.ID || "SANS ID", r.Chantier, r.Support, r.Tache, r.Fait, r.Observation
             ]);
 
             doc.autoTable({
@@ -286,7 +343,13 @@
                 body: tableRows,
                 theme: 'grid',
                 headStyles: { fillColor: [37, 99, 235], textColor: [255, 255, 255] },
-                styles: { fontSize: 9, cellPadding: 3 }
+                styles: { fontSize: 9, cellPadding: 3 },
+                didParseCell: function(data) {
+                    // Surlignage visuel dans le PDF si la ligne n'a pas d'ID (travail non prévu)
+                    if (data.row.raw[0] === "SANS ID") {
+                        data.cell.styles.fillColor = [254, 243, 199];
+                    }
+                }
             });
 
             const pdfOutput = doc.output('blob');
@@ -309,7 +372,6 @@
             doc.save(fileName);
         }
 
-        // Export PDF de l'avancement global (Page 2)
         async function partagerPDFAvancement() {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
