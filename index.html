@@ -85,20 +85,30 @@
         });
 
         // Export Global avec infos session
-        document.getElementById('btnExport').addEventListener('click', () => {
-            const dateEnvoi = new Date().toLocaleString();
-            const exportData = rawData.map(r => ({
-                ...r,
-                "SUTX": userName,
-                "Numéro RJ": sessionRJ,
-                "Date Envoi": dateEnvoi
-            }));
-            
-            const ws = XLSX.utils.json_to_sheet(exportData);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Suivi_Global");
-            XLSX.writeFile(wb, `Suivi_RJ_${sessionRJ}_${new Date().toLocaleDateString()}.xlsx`);
-        });
+document.getElementById('btnExport').addEventListener('click', () => {
+    const dateEnvoi = new Date().toLocaleString();
+    
+    // En-tête personnalisé
+    const headerInfo = [
+        ["SUTX", userName],
+        ["Numéro RJ", sessionRJ],
+        ["Date Envoi", dateEnvoi],
+        [], 
+        ["ID", "Chantier", "Support", "Tache", "Fait", "Observation"] // Colonnes incluant ID
+    ];
+
+    // Extraction des données avec la colonne ID
+    const dataRows = rawData.map(r => [
+        r.ID, r.Chantier, r.Support, r.Tache, r.Fait, r.Observation
+    ]);
+
+    const finalData = [...headerInfo, ...dataRows];
+    
+    const ws = XLSX.utils.aoa_to_sheet(finalData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Suivi_Global");
+    XLSX.writeFile(wb, `Suivi_RJ_${sessionRJ}.xlsx`);
+});
     </script>
 </body>
 </html>
