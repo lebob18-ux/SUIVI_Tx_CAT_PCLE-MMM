@@ -19,33 +19,60 @@
 <body class="bg-gray-100 p-4 min-h-screen">
     <div class="max-w-4xl mx-auto bg-white rounded-xl shadow-md p-6">
         
-        <!-- En-tête : Titre et Bouton Partager PDF -->
-        <div class="flex justify-between items-center mb-2 border-b pb-4">
-            <h1 class="text-xl font-bold text-gray-800">📋 Suivi des Travaux</h1>
-            <button id="btnSharePDF" class="hidden bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold shadow transition flex items-center gap-2">
-                <span>📄</span> Partager PDF
+        <!-- Barre des onglets de navigation -->
+        <div class="flex gap-2 mb-6 border-b pb-4">
+            <button id="tabPage1" onclick="changerOnglet(1)" class="flex-1 py-2 px-4 rounded-lg font-bold text-sm bg-blue-600 text-white shadow transition">
+                📋 Saisie & Suivi
+            </button>
+            <button id="tabPage2" onclick="changerOnglet(2)" class="flex-1 py-2 px-4 rounded-lg font-bold text-sm bg-gray-200 text-gray-700 hover:bg-gray-300 transition">
+                📊 Avancement Chantiers
             </button>
         </div>
-        
-        <div id="headerInfo" class="text-sm text-blue-700 mb-6 font-semibold bg-blue-50 p-2.5 rounded-lg border border-blue-100"></div>
-        
-        <!-- Sélection Chantier & Support sur la même ligne -->
-        <div class="grid grid-cols-2 gap-4 mb-6">
-            <div>
-                <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Chantier :</label>
-                <select id="selectChantier" class="w-full p-2.5 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500">
-                    <option value="">Choisir...</option>
-                </select>
+
+        <!-- ================= PAGE 1 : SAISIE ================= -->
+        <div id="page1">
+            <!-- En-tête : Titre et Bouton Partager PDF -->
+            <div class="flex justify-between items-center mb-2 border-b pb-4">
+                <h1 class="text-xl font-bold text-gray-800">📋 Suivi des Travaux</h1>
+                <button id="btnSharePDF" class="hidden bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold shadow transition flex items-center gap-2">
+                    <span>📄</span> Partager PDF
+                </button>
             </div>
-            <div>
-                <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Support :</label>
-                <select id="selectSupport" class="w-full p-2.5 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500" disabled>
-                    <option value="">Choisir...</option>
-                </select>
+            
+            <div id="headerInfo" class="text-sm text-blue-700 mb-6 font-semibold bg-blue-50 p-2.5 rounded-lg border border-blue-100"></div>
+            
+            <!-- Sélection Chantier & Support sur la même ligne -->
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <div>
+                    <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Chantier :</label>
+                    <select id="selectChantier" class="w-full p-2.5 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500">
+                        <option value="">Choisir...</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Support :</label>
+                    <select id="selectSupport" class="w-full p-2.5 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500" disabled>
+                        <option value="">Choisir...</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="containerTaches" class="hidden space-y-3"></div>
+        </div>
+
+        <!-- ================= PAGE 2 : AVANCEMENT CHANTIERS ================= -->
+        <div id="page2" class="hidden">
+            <div class="flex justify-between items-center mb-4 border-b pb-4">
+                <h2 class="text-xl font-bold text-gray-800">📊 Avancement Global des Chantiers</h2>
+                <button onclick="partagerPDFAvancement()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold shadow transition flex items-center gap-2 text-sm">
+                    <span>📲</span> Partager PDF Avancement
+                </button>
+            </div>
+            <div id="conteneurAvancement" class="space-y-4">
+                <p class="text-gray-500 text-sm italic text-center py-4">Chargement de l'avancement...</p>
             </div>
         </div>
 
-        <div id="containerTaches" class="hidden space-y-3"></div>
     </div>
 
     <script>
@@ -69,14 +96,72 @@
             Papa.parse("data_tx_cat.csv", {
                 download: true, header: true, delimiter: ";", skipEmptyLines: true,
                 complete: (results) => {
-                    // On ajoute un drapeau 'modifie: false' à chaque ligne au démarrage
                     rawData = results.data.map(r => ({ ...r, modifie: false }));
                     const chantiers = [...new Set(rawData.map(r => r.Chantier))].filter(Boolean);
                     const selectChantier = document.getElementById('selectChantier');
                     chantiers.forEach(c => selectChantier.add(new Option(c, c)));
+
+                    // Aiguillage automatique si le nom contient LAVIGNON
+                    if (userName.toUpperCase().includes("LAVIGNON")) {
+                        changerOnglet(2);
+                    }
                 }
             });
         });
+
+        // Gestion de la navigation par onglets
+        function changerOnglet(numPage) {
+            const page1 = document.getElementById('page1');
+            const page2 = document.getElementById('page2');
+            const tab1 = document.getElementById('tabPage1');
+            const tab2 = document.getElementById('tabPage2');
+
+            if (numPage === 1) {
+                page1.classList.remove('hidden');
+                page2.classList.add('hidden');
+                tab1.className = "flex-1 py-2 px-4 rounded-lg font-bold text-sm bg-blue-600 text-white shadow transition";
+                tab2.className = "flex-1 py-2 px-4 rounded-lg font-bold text-sm bg-gray-200 text-gray-700 hover:bg-gray-300 transition";
+            } else {
+                page1.classList.add('hidden');
+                page2.classList.remove('hidden');
+                tab2.className = "flex-1 py-2 px-4 rounded-lg font-bold text-sm bg-blue-600 text-white shadow transition";
+                tab1.className = "flex-1 py-2 px-4 rounded-lg font-bold text-sm bg-gray-200 text-gray-700 hover:bg-gray-300 transition";
+                calculerEtAfficherAvancement();
+            }
+        }
+
+        // Calcul et affichage de l'avancement par chantier (Page 2)
+        function calculerEtAfficherAvancement() {
+            const conteneur = document.getElementById('conteneurAvancement');
+            conteneur.innerHTML = '';
+
+            const chantiers = [...new Set(rawData.map(r => r.Chantier))].filter(Boolean);
+
+            if (chantiers.length === 0) {
+                conteneur.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">Aucune donnée disponible.</p>';
+                return;
+            }
+
+            chantiers.forEach(chantier => {
+                const lignesChantier = rawData.filter(r => r.Chantier === chantier);
+                const totalTaches = lignesChantier.length;
+                const tachesFaites = lignesChantier.filter(r => ['vrai', 'true', '1'].includes(String(r.Fait).toLowerCase().trim())).length;
+                const pourcentage = totalTaches > 0 ? Math.round((tachesFaites / totalTaches) * 100) : 0;
+
+                const divChantier = document.createElement('div');
+                divChantier.className = "bg-gray-50 p-4 border rounded-lg shadow-sm";
+                divChantier.innerHTML = `
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="font-bold text-gray-800">${chantier}</span>
+                        <span class="text-sm font-semibold text-blue-600">${tachesFaites} / ${totalTaches} (${pourcentage}%)</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-3">
+                        <div class="bg-blue-600 h-3 rounded-full transition-all duration-500" style="width: ${pourcentage}%"></div>
+                    </div>
+                `;
+                conteneur.appendChild(divChantier);
+            });
+        }
 
         const selectChantier = document.getElementById('selectChantier');
         const selectSupport = document.getElementById('selectSupport');
@@ -130,15 +215,13 @@
             btnSharePDF.classList.remove('hidden');
         });
 
-        // Fonction pour marquer la ligne comme modifiée en direct
         window.modifierLigne = function(index, champ, valeur) {
             rawData[index][champ] = valeur;
-            rawData[index].modifie = true; // Marque comme modifié pendant la session
+            rawData[index].modifie = true;
         };
 
-        // Export et Partage PDF Stylé (Uniquement les éléments modifiés de la session)
+        // Export PDF de la Page 1 (Modifications de session)
         btnSharePDF.addEventListener('click', async () => {
-            // FILTRE : On ne garde que ce qui a été touché/modifié pendant la session
             const elementsModifies = rawData.filter(r => r.modifie === true);
 
             if (elementsModifies.length === 0) {
@@ -150,21 +233,18 @@
             const doc = new jsPDF();
             const dateEnvoi = new Date().toLocaleString();
 
-            // Style de l'en-tête du PDF
-            doc.setFillColor(37, 99, 235); // Bleu pro
+            doc.setFillColor(37, 99, 235);
             doc.rect(0, 0, 210, 25, 'F');
             doc.setTextColor(255, 255, 255);
             doc.setFontSize(16);
             doc.text("RAPPORT DE SUIVI - TRAVAUX", 14, 16);
 
-            // Infos SUTX et RJ
             doc.setTextColor(50, 50, 50);
             doc.setFontSize(11);
             doc.text(`Opérateur SUTX : ${userName}`, 14, 35);
             doc.text(`Numéro RJ : ${sessionRJ}`, 14, 42);
             doc.text(`Date d'envoi : ${dateEnvoi}`, 14, 49);
 
-            // Tableau stylé AutoTable avec uniquement les modifications
             const tableColumns = ["ID", "Chantier", "Support", "Tache", "Fait", "Observation"];
             const tableRows = elementsModifies.map(r => [
                 r.ID, r.Chantier, r.Support, r.Tache, r.Fait, r.Observation
@@ -183,7 +263,6 @@
             const fileName = `Suivi_Modifications_RJ_${sessionRJ}.pdf`;
             const file = new File([pdfOutput], fileName, { type: "application/pdf" });
 
-            // Partage natif mobile ou téléchargement direct
             try {
                 if (navigator.canShare && navigator.canShare({ files: [file] })) {
                     await navigator.share({
@@ -197,9 +276,62 @@
                 if (err.name === 'AbortError') return;
             }
 
-            // Fallback téléchargement PDF
             doc.save(fileName);
         });
+
+        // Export PDF de l'avancement global (Page 2)
+        async function partagerPDFAvancement() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            const chantiers = [...new Set(rawData.map(r => r.Chantier))].filter(Boolean);
+
+            doc.setFillColor(37, 99, 235);
+            doc.rect(0, 0, 210, 25, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(16);
+            doc.text("BILAN D'AVANCEMENT DES CHANTIERS", 14, 16);
+
+            doc.setTextColor(50, 50, 50);
+            doc.setFontSize(11);
+            doc.text(`Opérateur : ${userName} | RJ : ${sessionRJ}`, 14, 35);
+
+            const tableColumns = ["Chantier", "Tâches Réalisées", "Total Tâches", "Avancement"];
+            const tableRows = chantiers.map(chantier => {
+                const lignes = rawData.filter(r => r.Chantier === chantier);
+                const total = lignes.length;
+                const faites = lignes.filter(r => ['vrai', 'true', '1'].includes(String(r.Fait).toLowerCase().trim())).length;
+                const pct = total > 0 ? Math.round((faites / total) * 100) : 0;
+                return [chantier, faites, total, `${pct}%`];
+            });
+
+            doc.autoTable({
+                startY: 45,
+                head: [tableColumns],
+                body: tableRows,
+                theme: 'grid',
+                headStyles: { fillColor: [37, 99, 235], textColor: [255, 255, 255] },
+                styles: { fontSize: 10, cellPadding: 4 }
+            });
+
+            const pdfOutput = doc.output('blob');
+            const fileName = `Avancement_Chantiers_RJ_${sessionRJ}.pdf`;
+            const file = new File([pdfOutput], fileName, { type: "application/pdf" });
+
+            try {
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    await navigator.share({
+                        files: [file],
+                        title: 'Avancement Chantiers',
+                        text: `Bilan avancement chantiers - RJ ${sessionRJ}`
+                    });
+                    return;
+                }
+            } catch (err) {
+                if (err.name === 'AbortError') return;
+            }
+
+            doc.save(fileName);
+        }
     </script>
 </body>
 </html>
