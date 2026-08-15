@@ -303,8 +303,6 @@
         });
 
         function copierTravaux() {
-            // Pour la copie, pas besoin de demander le RJ puisque le RJ n'est plus inclus dans le texte récap.
-            // On peut copier directement les modifications de la session.
             copierDansPressePapier();
         }
 
@@ -322,7 +320,7 @@
         }
 
         function executerActionEnAttente() {
-            const saisiRJ = document.getElementById('rjInput'].value.trim();
+            const saisiRJ = document.getElementById('rjInput').value.trim();
             if (!saisiRJ) {
                 alert("Veuillez entrer un numéro RJ valide.");
                 return;
@@ -336,9 +334,8 @@
             }
         }
 
-        // Copie optimisée : uniquement Support et Tâches faites (modifiées/cochées à Vrai)
+        // Copie optimisée : Support, Tâches faites et Observations associées
         async function copierDansPressePapier() {
-            // On filtre les éléments modifiés qui sont cochés comme "Vrais" (faits)
             const elementsFaites = rawData.filter(r => r.modifie === true && ['vrai', 'true', '1'].includes(String(r.Fait).toLowerCase().trim()));
 
             if (elementsFaites.length === 0) {
@@ -346,29 +343,36 @@
                 return;
             }
 
-            // Grouper par Support pour un affichage propre et lisible
+            // Grouper par Support
             const supportsGrouper = {};
             elementsFaites.forEach(r => {
                 const support = r.Support || "Support inconnu";
                 if (!supportsGrouper[support]) {
                     supportsGrouper[support] = [];
                 }
-                supportsGrouper[support].push(r.Tache);
+                supportsGrouper[support].push({
+                    tache: r.Tache,
+                    observation: r.Observation ? r.Observation.trim() : ""
+                });
             });
 
-            // Construction du texte récapitulatif
+            // Construction du texte récapitulatif avec les observations
             let texteFinal = "";
-            for (const [support, taches] of Object.entries(supportsGrouper)) {
+            for (const [support, items] of Object.entries(supportsGrouper)) {
                 texteFinal += `Support : ${support}\n`;
-                taches.forEach(tache => {
-                    texteFinal += `- ${tache}\n`;
+                items.forEach(item => {
+                    if (item.observation) {
+                        texteFinal += `- ${item.tache} (Obs: ${item.observation})\n`;
+                    } else {
+                        texteFinal += `- ${item.tache}\n`;
+                    }
                 });
                 texteFinal += `\n`;
             }
 
             try {
                 await navigator.clipboard.writeText(texteFinal.trim());
-                alert("✅ Récapitulatif copié dans le presse-papiers !\n\nVous pouvez le coller (Ctrl+V) dans votre autre application.");
+                alert("✅ Récapitulatif (avec observations) copié dans le presse-papiers !\n\nVous pouvez le coller (Ctrl+V) dans votre autre application.");
             } catch (err) {
                 console.error("Erreur de copie : ", err);
                 alert("Erreur lors de la copie automatique.");
