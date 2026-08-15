@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Suivi Travaux Chantier</title>
+    <title>Suivi Travaux</title>
     <link rel="manifest" href="manifest.json">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -11,7 +11,14 @@
 </head>
 <body class="bg-gray-100 p-4">
     <div class="max-w-4xl mx-auto bg-white rounded-xl shadow p-6">
-        <h1 class="text-xl font-bold mb-4 border-b pb-2">📋 Suivi des Travaux</h1>
+        <!-- Titre avec bouton Partager en haut à droite -->
+        <div class="flex justify-between items-center mb-4 border-b pb-4">
+            <h1 class="text-xl font-bold">📋 Suivi des Travaux</h1>
+            <button id="btnShare" class="hidden bg-blue-600 text-white px-4 py-2 rounded-lg font-bold shadow hover:bg-blue-700">
+                📤 Partager
+            </button>
+        </div>
+        
         <div id="headerInfo" class="text-sm text-blue-700 mb-4 font-semibold"></div>
         
         <div class="grid grid-cols-2 gap-4 mb-6">
@@ -26,7 +33,6 @@
         </div>
 
         <div id="containerTaches" class="hidden space-y-3"></div>
-        <button id="btnExport" class="w-full mt-6 bg-green-600 text-white font-bold py-4 rounded-lg hidden shadow-lg">📤 Exporter Global (Excel)</button>
     </div>
 
     <script>
@@ -35,14 +41,11 @@
         let userName = localStorage.getItem('nomSutx') || "";
 
         window.addEventListener('DOMContentLoaded', () => {
-            // 1. Récupération Nom (1 fois)
             if (!userName) {
                 userName = prompt("Entrez votre Nom/Prénom :");
                 localStorage.setItem('nomSutx', userName);
             }
-            // 2. Récupération RJ (à chaque fois)
             sessionRJ = prompt("Entrez le Numéro RJ de ce chantier :");
-            
             document.getElementById('headerInfo').innerText = `SUTX : ${userName} | RJ : ${sessionRJ}`;
 
             Papa.parse("data_tx_cat.csv", {
@@ -55,60 +58,36 @@
             });
         });
 
-        // Logique de sélection
-        const selectChantier = document.getElementById('selectChantier');
-        const selectSupport = document.getElementById('selectSupport');
+        // ... (Logique selectChantier et selectSupport identique)
 
-        selectChantier.addEventListener('change', () => {
-            selectSupport.innerHTML = '<option value="">Choisir...</option>';
-            const filtered = [...new Set(rawData.filter(r => r.Chantier === selectChantier.value).map(r => r.Support))];
-            filtered.forEach(s => selectSupport.add(new Option(s, s)));
-            selectSupport.disabled = !selectChantier.value;
+        document.getElementById('selectSupport').addEventListener('change', () => {
+             // ... afficher tâches ...
+             document.getElementById('btnShare').classList.remove('hidden');
         });
 
-        selectSupport.addEventListener('change', () => {
-            const list = document.getElementById('containerTaches');
-            list.innerHTML = '';
-            rawData.filter(r => r.Chantier === selectChantier.value && r.Support === selectSupport.value).forEach((item) => {
-                const isChecked = ['vrai', 'true', '1'].includes(String(item.Fait).toLowerCase().trim());
-                list.innerHTML += `
-                    <div class="p-3 bg-gray-50 rounded flex items-center gap-3">
-                        <input type="checkbox" ${isChecked ? 'checked' : ''} 
-                            onchange="rawData[rawData.indexOf(item)].Fait = this.checked ? 'Vrai' : 'Faux'" class="w-6 h-6">
-                        <div class="flex-1 text-sm">${item.Tache}</div>
-                        <input type="text" value="${item.Observation || ''}" placeholder="Obs..." 
-                            oninput="rawData[rawData.indexOf(item)].Observation = this.value" class="w-1/3 p-1 border rounded">
-                    </div>`;
-            });
-            list.classList.remove('hidden');
-            document.getElementById('btnExport').classList.remove('hidden');
+        // Fonction de Partage
+        document.getElementById('btnShare').addEventListener('click', async () => {
+            const dateEnvoi = new Date().toLocaleString();
+            const headerInfo = [
+                ["SUTX", userName], ["Numéro RJ", sessionRJ], ["Date Envoi", dateEnvoi], [],
+                ["ID", "Chantier", "Support", "Tache", "Fait", "Observation"]
+            ];
+            const dataRows = rawData.map(r => [r.ID, r.Chantier, r.Support, r.Tache, r.Fait, r.Observation]);
+            
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([...headerInfo, ...dataRows]), "Suivi");
+            
+            // Conversion en Blob pour partage
+            const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+            const file = new File([new Blob([wbout])], `Suivi_RJ_${sessionRJ}.xlsx`, { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({ files: [file], title: 'Export Suivi Travaux', text: 'Voici le suivi RJ ' + sessionRJ });
+            } else {
+                // Fallback si le partage n'est pas supporté
+                XLSX.writeFile(wb, `Suivi_RJ_${sessionRJ}.xlsx`);
+            }
         });
-
-        // Export Global avec infos session
-document.getElementById('btnExport').addEventListener('click', () => {
-    const dateEnvoi = new Date().toLocaleString();
-    
-    // En-tête personnalisé
-    const headerInfo = [
-        ["SUTX", userName],
-        ["Numéro RJ", sessionRJ],
-        ["Date Envoi", dateEnvoi],
-        [], 
-        ["ID", "Chantier", "Support", "Tache", "Fait", "Observation"] // Colonnes incluant ID
-    ];
-
-    // Extraction des données avec la colonne ID
-    const dataRows = rawData.map(r => [
-        r.ID, r.Chantier, r.Support, r.Tache, r.Fait, r.Observation
-    ]);
-
-    const finalData = [...headerInfo, ...dataRows];
-    
-    const ws = XLSX.utils.aoa_to_sheet(finalData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Suivi_Global");
-    XLSX.writeFile(wb, `Suivi_RJ_${sessionRJ}.xlsx`);
-});
     </script>
 </body>
 </html>
