@@ -3,41 +3,48 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Suivi Travaux</title>
+    <title>Suivi Travaux - SUTX</title>
     <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#2563eb">
+    <link rel="icon" href="icon-192.png" type="image/png">
+
+    <!-- Tailwind CSS, SheetJS, PapaParse -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <!-- jsPDF et AutoTable pour un PDF pro -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 </head>
-<body class="bg-gray-100 p-4">
-    <div class="max-w-4xl mx-auto bg-white rounded-xl shadow p-6">
-        <!-- En-tête : Titre et bouton Partager alignés -->
-        <div class="flex justify-between items-center mb-4 border-b pb-4">
-            <h1 class="text-xl font-bold">📋 Suivi des Travaux</h1>
-            <button id="btnShare" class="hidden bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold shadow transition">
-                📤 Partager
+<body class="bg-gray-100 p-4 min-h-screen">
+    <div class="max-w-4xl mx-auto bg-white rounded-xl shadow-md p-6">
+        
+        <!-- En-tête : Titre et Bouton Partager PDF -->
+        <div class="flex justify-between items-center mb-2 border-b pb-4">
+            <h1 class="text-xl font-bold text-gray-800">📋 Suivi des Travaux</h1>
+            <button id="btnSharePDF" class="hidden bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold shadow transition flex items-center gap-2">
+                <span>📄</span> Partager PDF
             </button>
         </div>
         
-        <div id="headerInfo" class="text-sm text-blue-700 mb-4 font-semibold"></div>
+        <div id="headerInfo" class="text-sm text-blue-700 mb-6 font-semibold bg-blue-50 p-2.5 rounded-lg border border-blue-100"></div>
         
         <!-- Sélection Chantier & Support sur la même ligne -->
         <div class="grid grid-cols-2 gap-4 mb-6">
             <div>
                 <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Chantier :</label>
-                <select id="selectChantier" class="w-full p-2 border rounded bg-gray-50 focus:ring-2 focus:ring-blue-500">
+                <select id="selectChantier" class="w-full p-2.5 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500">
                     <option value="">Choisir...</option>
                 </select>
             </div>
             <div>
                 <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Support :</label>
-                <select id="selectSupport" class="w-full p-2 border rounded bg-gray-50 focus:ring-2 focus:ring-blue-500" disabled>
+                <select id="selectSupport" class="w-full p-2.5 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500" disabled>
                     <option value="">Choisir...</option>
                 </select>
             </div>
         </div>
 
-        <!-- Liste des tâches -->
         <div id="containerTaches" class="hidden space-y-3"></div>
     </div>
 
@@ -47,27 +54,26 @@
         let userName = localStorage.getItem('nomSutx') || "";
 
         window.addEventListener('DOMContentLoaded', () => {
-            // 1. Récupération Nom (1 seule fois)
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('sw.js').catch(console.error);
+            }
+
             if (!userName) {
                 userName = prompt("Entrez votre Nom/Prénom :") || "Inconnu";
                 localStorage.setItem('nomSutx', userName);
             }
-            // 2. Récupération RJ (à chaque session)
             sessionRJ = prompt("Entrez le Numéro RJ de ce chantier :") || "0000";
             
-            document.getElementById('headerInfo').innerText = `SUTX : ${userName} | RJ : ${sessionRJ}`;
+            document.getElementById('headerInfo').innerText = `👤 SUTX : ${userName} | 📌 RJ : ${sessionRJ}`;
 
-            // 3. Chargement du CSV
             Papa.parse("data_tx_cat.csv", {
                 download: true, header: true, delimiter: ";", skipEmptyLines: true,
                 complete: (results) => {
-                    rawData = results.data;
+                    // On ajoute un drapeau 'modifie: false' à chaque ligne au démarrage
+                    rawData = results.data.map(r => ({ ...r, modifie: false }));
                     const chantiers = [...new Set(rawData.map(r => r.Chantier))].filter(Boolean);
                     const selectChantier = document.getElementById('selectChantier');
                     chantiers.forEach(c => selectChantier.add(new Option(c, c)));
-                },
-                error: (err) => {
-                    alert("Erreur de chargement du fichier CSV : " + err.message);
                 }
             });
         });
@@ -75,26 +81,21 @@
         const selectChantier = document.getElementById('selectChantier');
         const selectSupport = document.getElementById('selectSupport');
         const containerTaches = document.getElementById('containerTaches');
-        const btnShare = document.getElementById('btnShare');
+        const btnSharePDF = document.getElementById('btnSharePDF');
 
-        // Étape 1 : Quand on change de chantier, on remplit les supports correspondants
         selectChantier.addEventListener('change', () => {
             selectSupport.innerHTML = '<option value="">Choisir...</option>';
             containerTaches.classList.add('hidden');
-            btnShare.classList.add('hidden');
-
             const chantierChoisi = selectChantier.value;
             if (!chantierChoisi) {
                 selectSupport.disabled = true;
                 return;
             }
-
             const supports = [...new Set(rawData.filter(r => r.Chantier === chantierChoisi).map(r => r.Support))].filter(Boolean);
             supports.forEach(s => selectSupport.add(new Option(s, s)));
             selectSupport.disabled = false;
         });
 
-        // Étape 2 : Quand on change de support, on affiche les tâches associées
         selectSupport.addEventListener('change', () => {
             containerTaches.innerHTML = '';
             const chantierChoisi = selectChantier.value;
@@ -102,7 +103,7 @@
 
             if (!supportChoisi) {
                 containerTaches.classList.add('hidden');
-                btnShare.classList.add('hidden');
+                btnSharePDF.classList.add('hidden');
                 return;
             }
 
@@ -115,53 +116,89 @@
                 div.className = "p-3 bg-gray-50 border rounded-lg flex items-center gap-3";
                 div.innerHTML = `
                     <input type="checkbox" ${isChecked ? 'checked' : ''} 
-                        onchange="rawData[rawData.indexOf(item)].Fait = this.checked ? 'Vrai' : 'Faux'" 
+                        onchange="modifierLigne(${rawData.indexOf(item)}, 'Fait', this.checked ? 'Vrai' : 'Faux')" 
                         class="w-6 h-6 text-blue-600 rounded cursor-pointer">
                     <div class="flex-1 text-sm font-medium text-gray-800">${item.Tache}</div>
                     <input type="text" value="${item.Observation || ''}" placeholder="Observation..." 
-                        oninput="rawData[rawData.indexOf(item)].Observation = this.value" 
-                        class="w-1/3 p-1.5 text-sm border rounded bg-white">
+                        oninput="modifierLigne(${rawData.indexOf(item)}, 'Observation', this.value)" 
+                        class="w-1/3 p-1.5 text-sm border rounded bg-white focus:ring-2 focus:ring-blue-500">
                 `;
                 containerTaches.appendChild(div);
             });
 
             containerTaches.classList.remove('hidden');
-            btnShare.classList.remove('hidden'); // Le bouton Partager apparaît enfin ici !
+            btnSharePDF.classList.remove('hidden');
         });
 
-        // Étape 3 : Action du bouton Partager / Export Excel Global
-        btnShare.addEventListener('click', async () => {
-            const dateEnvoi = new Date().toLocaleString();
-            
-            const headerInfo = [
-                ["SUTX", userName],
-                ["Numéro RJ", sessionRJ],
-                ["Date Envoi", dateEnvoi],
-                [], 
-                ["ID", "Chantier", "Support", "Tache", "Fait", "Observation"]
-            ];
+        // Fonction pour marquer la ligne comme modifiée en direct
+        window.modifierLigne = function(index, champ, valeur) {
+            rawData[index][champ] = valeur;
+            rawData[index].modifie = true; // Marque comme modifié pendant la session
+        };
 
-            const dataRows = rawData.map(r => [
+        // Export et Partage PDF Stylé (Uniquement les éléments modifiés de la session)
+        btnSharePDF.addEventListener('click', async () => {
+            // FILTRE : On ne garde que ce qui a été touché/modifié pendant la session
+            const elementsModifies = rawData.filter(r => r.modifie === true);
+
+            if (elementsModifies.length === 0) {
+                alert("Aucune modification n'a été effectuée pendant cette session.");
+                return;
+            }
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            const dateEnvoi = new Date().toLocaleString();
+
+            // Style de l'en-tête du PDF
+            doc.setFillColor(37, 99, 235); // Bleu pro
+            doc.rect(0, 0, 210, 25, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(16);
+            doc.text("RAPPORT DE SUIVI - TRAVAUX", 14, 16);
+
+            // Infos SUTX et RJ
+            doc.setTextColor(50, 50, 50);
+            doc.setFontSize(11);
+            doc.text(`Opérateur SUTX : ${userName}`, 14, 35);
+            doc.text(`Numéro RJ : ${sessionRJ}`, 14, 42);
+            doc.text(`Date d'envoi : ${dateEnvoi}`, 14, 49);
+
+            // Tableau stylé AutoTable avec uniquement les modifications
+            const tableColumns = ["ID", "Chantier", "Support", "Tache", "Fait", "Observation"];
+            const tableRows = elementsModifies.map(r => [
                 r.ID, r.Chantier, r.Support, r.Tache, r.Fait, r.Observation
             ]);
 
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([...headerInfo, ...dataRows]), "Suivi_Global");
-            
-            const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-            const file = new File([new Blob([wbout])], `Suivi_RJ_${sessionRJ}.xlsx`, { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+            doc.autoTable({
+                startY: 55,
+                head: [tableColumns],
+                body: tableRows,
+                theme: 'grid',
+                headStyles: { fillColor: [37, 99, 235], textColor: [255, 255, 255] },
+                styles: { fontSize: 9, cellPadding: 3 }
+            });
 
-            // Tentative de partage natif (mobile)
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                try {
-                    await navigator.share({ files: [file], title: 'Export Suivi Travaux', text: `Suivi RJ ${sessionRJ}` });
-                } catch (err) {
-                    if (err.name !== 'AbortError') console.error(err);
+            const pdfOutput = doc.output('blob');
+            const fileName = `Suivi_Modifications_RJ_${sessionRJ}.pdf`;
+            const file = new File([pdfOutput], fileName, { type: "application/pdf" });
+
+            // Partage natif mobile ou téléchargement direct
+            try {
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    await navigator.share({
+                        files: [file],
+                        title: 'Rapport Suivi Travaux',
+                        text: `Modifications RJ ${sessionRJ} - ${userName}`
+                    });
+                    return;
                 }
-            } else {
-                // Fallback de secours (téléchargement direct si le partage échoue ou sur PC)
-                XLSX.writeFile(wb, `Suivi_RJ_${sessionRJ}.xlsx`);
+            } catch (err) {
+                if (err.name === 'AbortError') return;
             }
+
+            // Fallback téléchargement PDF
+            doc.save(fileName);
         });
     </script>
 </body>
