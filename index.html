@@ -46,7 +46,7 @@
                 navigator.serviceWorker.register('sw.js').catch(console.error);
             }
 
-            Papa.parse("data.csv", {
+            Papa.parse("data_tx_cat.csv", {
                 download: true, header: true, delimiter: ";", skipEmptyLines: true,
                 complete: (results) => { 
                     rawData = results.data; 
