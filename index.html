@@ -11,27 +11,33 @@
 </head>
 <body class="bg-gray-100 p-4">
     <div class="max-w-4xl mx-auto bg-white rounded-xl shadow p-6">
-        <!-- Titre avec bouton Partager en haut à droite -->
+        <!-- En-tête : Titre et bouton Partager alignés -->
         <div class="flex justify-between items-center mb-4 border-b pb-4">
             <h1 class="text-xl font-bold">📋 Suivi des Travaux</h1>
-            <button id="btnShare" class="hidden bg-blue-600 text-white px-4 py-2 rounded-lg font-bold shadow hover:bg-blue-700">
+            <button id="btnShare" class="hidden bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold shadow transition">
                 📤 Partager
             </button>
         </div>
         
         <div id="headerInfo" class="text-sm text-blue-700 mb-4 font-semibold"></div>
         
+        <!-- Sélection Chantier & Support sur la même ligne -->
         <div class="grid grid-cols-2 gap-4 mb-6">
             <div>
-                <label class="block text-xs font-bold uppercase">Chantier :</label>
-                <select id="selectChantier" class="w-full p-2 border rounded bg-gray-50"><option value="">Choisir...</option></select>
+                <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Chantier :</label>
+                <select id="selectChantier" class="w-full p-2 border rounded bg-gray-50 focus:ring-2 focus:ring-blue-500">
+                    <option value="">Choisir...</option>
+                </select>
             </div>
             <div>
-                <label class="block text-xs font-bold uppercase">Support :</label>
-                <select id="selectSupport" class="w-full p-2 border rounded bg-gray-50" disabled><option value="">Choisir...</option></select>
+                <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Support :</label>
+                <select id="selectSupport" class="w-full p-2 border rounded bg-gray-50 focus:ring-2 focus:ring-blue-500" disabled>
+                    <option value="">Choisir...</option>
+                </select>
             </div>
         </div>
 
+        <!-- Liste des tâches -->
         <div id="containerTaches" class="hidden space-y-3"></div>
     </div>
 
@@ -41,50 +47,119 @@
         let userName = localStorage.getItem('nomSutx') || "";
 
         window.addEventListener('DOMContentLoaded', () => {
+            // 1. Récupération Nom (1 seule fois)
             if (!userName) {
-                userName = prompt("Entrez votre Nom/Prénom :");
+                userName = prompt("Entrez votre Nom/Prénom :") || "Inconnu";
                 localStorage.setItem('nomSutx', userName);
             }
-            sessionRJ = prompt("Entrez le Numéro RJ de ce chantier :");
+            // 2. Récupération RJ (à chaque session)
+            sessionRJ = prompt("Entrez le Numéro RJ de ce chantier :") || "0000";
+            
             document.getElementById('headerInfo').innerText = `SUTX : ${userName} | RJ : ${sessionRJ}`;
 
+            // 3. Chargement du CSV
             Papa.parse("data_tx_cat.csv", {
                 download: true, header: true, delimiter: ";", skipEmptyLines: true,
                 complete: (results) => {
                     rawData = results.data;
-                    const chantiers = [...new Set(rawData.map(r => r.Chantier))];
+                    const chantiers = [...new Set(rawData.map(r => r.Chantier))].filter(Boolean);
+                    const selectChantier = document.getElementById('selectChantier');
                     chantiers.forEach(c => selectChantier.add(new Option(c, c)));
+                },
+                error: (err) => {
+                    alert("Erreur de chargement du fichier CSV : " + err.message);
                 }
             });
         });
 
-        // ... (Logique selectChantier et selectSupport identique)
+        const selectChantier = document.getElementById('selectChantier');
+        const selectSupport = document.getElementById('selectSupport');
+        const containerTaches = document.getElementById('containerTaches');
+        const btnShare = document.getElementById('btnShare');
 
-        document.getElementById('selectSupport').addEventListener('change', () => {
-             // ... afficher tâches ...
-             document.getElementById('btnShare').classList.remove('hidden');
+        // Étape 1 : Quand on change de chantier, on remplit les supports correspondants
+        selectChantier.addEventListener('change', () => {
+            selectSupport.innerHTML = '<option value="">Choisir...</option>';
+            containerTaches.classList.add('hidden');
+            btnShare.classList.add('hidden');
+
+            const chantierChoisi = selectChantier.value;
+            if (!chantierChoisi) {
+                selectSupport.disabled = true;
+                return;
+            }
+
+            const supports = [...new Set(rawData.filter(r => r.Chantier === chantierChoisi).map(r => r.Support))].filter(Boolean);
+            supports.forEach(s => selectSupport.add(new Option(s, s)));
+            selectSupport.disabled = false;
         });
 
-        // Fonction de Partage
-        document.getElementById('btnShare').addEventListener('click', async () => {
+        // Étape 2 : Quand on change de support, on affiche les tâches associées
+        selectSupport.addEventListener('change', () => {
+            containerTaches.innerHTML = '';
+            const chantierChoisi = selectChantier.value;
+            const supportChoisi = selectSupport.value;
+
+            if (!supportChoisi) {
+                containerTaches.classList.add('hidden');
+                btnShare.classList.add('hidden');
+                return;
+            }
+
+            const lignesFiltrees = rawData.filter(r => r.Chantier === chantierChoisi && r.Support === supportChoisi);
+
+            lignesFiltrees.forEach((item) => {
+                const isChecked = ['vrai', 'true', '1'].includes(String(item.Fait).toLowerCase().trim());
+                
+                const div = document.createElement('div');
+                div.className = "p-3 bg-gray-50 border rounded-lg flex items-center gap-3";
+                div.innerHTML = `
+                    <input type="checkbox" ${isChecked ? 'checked' : ''} 
+                        onchange="rawData[rawData.indexOf(item)].Fait = this.checked ? 'Vrai' : 'Faux'" 
+                        class="w-6 h-6 text-blue-600 rounded cursor-pointer">
+                    <div class="flex-1 text-sm font-medium text-gray-800">${item.Tache}</div>
+                    <input type="text" value="${item.Observation || ''}" placeholder="Observation..." 
+                        oninput="rawData[rawData.indexOf(item)].Observation = this.value" 
+                        class="w-1/3 p-1.5 text-sm border rounded bg-white">
+                `;
+                containerTaches.appendChild(div);
+            });
+
+            containerTaches.classList.remove('hidden');
+            btnShare.classList.remove('hidden'); // Le bouton Partager apparaît enfin ici !
+        });
+
+        // Étape 3 : Action du bouton Partager / Export Excel Global
+        btnShare.addEventListener('click', async () => {
             const dateEnvoi = new Date().toLocaleString();
+            
             const headerInfo = [
-                ["SUTX", userName], ["Numéro RJ", sessionRJ], ["Date Envoi", dateEnvoi], [],
+                ["SUTX", userName],
+                ["Numéro RJ", sessionRJ],
+                ["Date Envoi", dateEnvoi],
+                [], 
                 ["ID", "Chantier", "Support", "Tache", "Fait", "Observation"]
             ];
-            const dataRows = rawData.map(r => [r.ID, r.Chantier, r.Support, r.Tache, r.Fait, r.Observation]);
-            
+
+            const dataRows = rawData.map(r => [
+                r.ID, r.Chantier, r.Support, r.Tache, r.Fait, r.Observation
+            ]);
+
             const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([...headerInfo, ...dataRows]), "Suivi");
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([...headerInfo, ...dataRows]), "Suivi_Global");
             
-            // Conversion en Blob pour partage
             const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
             const file = new File([new Blob([wbout])], `Suivi_RJ_${sessionRJ}.xlsx`, { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
 
+            // Tentative de partage natif (mobile)
             if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                await navigator.share({ files: [file], title: 'Export Suivi Travaux', text: 'Voici le suivi RJ ' + sessionRJ });
+                try {
+                    await navigator.share({ files: [file], title: 'Export Suivi Travaux', text: `Suivi RJ ${sessionRJ}` });
+                } catch (err) {
+                    if (err.name !== 'AbortError') console.error(err);
+                }
             } else {
-                // Fallback si le partage n'est pas supporté
+                // Fallback de secours (téléchargement direct si le partage échoue ou sur PC)
                 XLSX.writeFile(wb, `Suivi_RJ_${sessionRJ}.xlsx`);
             }
         });
