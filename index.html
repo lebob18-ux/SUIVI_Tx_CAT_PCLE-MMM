@@ -20,18 +20,20 @@
 </head>
 <body class="bg-gray-100 p-4 min-h-screen">
 
-    <!-- ÉCRAN DE CONNEXION / DEMANDE D'ACCÈS -->
+    <!-- ÉCRAN D'IDENTIFICATION (Nom, Prénom, Email) -->
     <div id="auth-overlay" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
         <div class="bg-white p-6 rounded-xl shadow-xl w-full max-w-sm text-center">
-            <h2 class="text-xl font-bold text-gray-800 mb-2">🔐 Contrôle d'accès SUTX</h2>
-            <p class="text-xs text-gray-600 mb-4">Entrez votre adresse email pour vérifier vos droits d'accès.</p>
-            <input type="email" id="email-auth-input" placeholder="votre.email@sncf.fr" class="w-full p-2.5 border rounded-lg mb-3 text-sm focus:ring-2 focus:ring-blue-500">
-            <button onclick="verifierAccesEmail()" class="w-full bg-blue-600 hover:bg-blue-700 text-white p-2.5 rounded-lg font-bold text-sm shadow transition">Se connecter</button>
+            <h2 class="text-xl font-bold text-gray-800 mb-2">🔐 Identification SUTX</h2>
+            <p class="text-xs text-gray-600 mb-4">Veuillez renseigner vos informations pour accéder à l'application.</p>
+            <input type="text" id="auth-nom" placeholder="Votre Nom" class="w-full p-2.5 border rounded-lg mb-3 text-sm focus:ring-2 focus:ring-blue-500">
+            <input type="text" id="auth-prenom" placeholder="Votre Prénom" class="w-full p-2.5 border rounded-lg mb-3 text-sm focus:ring-2 focus:ring-blue-500">
+            <input type="email" id="auth-email" placeholder="votre.email@sncf.fr" class="w-full p-2.5 border rounded-lg mb-4 text-sm focus:ring-2 focus:ring-blue-500">
+            <button onclick="enregistrerConnexion()" class="w-full bg-blue-600 hover:bg-blue-700 text-white p-2.5 rounded-lg font-bold text-sm shadow transition">Valider & Entrer</button>
             <p id="auth-error" class="text-red-500 text-xs mt-3 hidden"></p>
         </div>
     </div>
 
-    <!-- CONTENU PRINCIPAL (Masqué tant que l'accès n'est pas validé) -->
+    <!-- CONTENU PRINCIPAL (Masqué tant que l'identification n'est pas faite) -->
     <div id="main-app" class="max-w-4xl mx-auto bg-white rounded-xl shadow-md p-6 hidden">
         
         <!-- Barre des onglets de navigation -->
@@ -46,7 +48,6 @@
 
         <!-- ================= PAGE 1 : SAISIE ================= -->
         <div id="page1">
-            <!-- En-tête : Titre et Boutons d'action (Partager PDF & Copier) -->
             <div class="flex flex-wrap justify-between items-center mb-2 border-b pb-4 gap-2">
                 <h1 class="text-xl font-bold text-gray-800">📋 Suivi des Travaux</h1>
                 <div id="containerActions" class="hidden flex gap-2">
@@ -61,7 +62,6 @@
             
             <div id="headerInfo" class="text-sm text-blue-700 mb-6 font-semibold bg-blue-50 p-2.5 rounded-lg border border-blue-100"></div>
             
-            <!-- Sélection Chantier & Support sur la même ligne -->
             <div class="grid grid-cols-2 gap-4 mb-6">
                 <div>
                     <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Chantier :</label>
@@ -77,7 +77,6 @@
                 </div>
             </div>
 
-            <!-- Conteneur des tâches avec bouton d'ajout de tâche non prévue -->
             <div id="sectionTachesSupport" class="hidden space-y-3">
                 <div class="flex justify-between items-center pt-2">
                     <h3 class="font-bold text-sm text-gray-700">Liste des tâches :</h3>
@@ -104,7 +103,7 @@
 
     </div>
 
-    <!-- Modale pour demander le RJ lors d'une action de partage sur la Page 1 -->
+    <!-- Modale RJ -->
     <div id="divRJModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div class="bg-white p-6 rounded-xl shadow-lg w-85 max-w-sm text-center">
             <p class="font-bold text-lg mb-2 text-gray-800">🌙 Numéro RJ requis</p>
@@ -117,7 +116,7 @@
         </div>
     </div>
 
-    <!-- Modale pour ajouter un travail non prévu manuellement -->
+    <!-- Modale Ajout Tâche -->
     <div id="divAjoutTacheModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div class="bg-white p-6 rounded-xl shadow-lg w-90 max-w-sm">
             <p class="font-bold text-lg mb-2 text-gray-800 text-center">➕ Ajouter un travail non prévu</p>
@@ -135,12 +134,14 @@
         /* ================= CONFIGURATION SUPABASE ================= */
 const SUPABASE_URL = "https://thbqkeugjvsxbryfnzuo.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
+
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         let rawData = [];
         let sessionRJ = "";
         let userEmail = localStorage.getItem('emailSutx') || "";
         let userName = localStorage.getItem('nomSutx') || "";
+        let userPrenom = localStorage.getItem('prenomSutx') || "";
         let actionEnCours = null;
 
         window.addEventListener('DOMContentLoaded', () => {
@@ -148,60 +149,61 @@ const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
                 navigator.serviceWorker.register('sw.js').catch(console.error);
             }
 
-            // Si un email est déjà stocké, on tente de le reconnecter directement
-            if (userEmail) {
-                document.getElementById('email-auth-input').value = userEmail;
-                verifierAccesEmail(true);
+            // Si les infos sont déjà stockées, on connecte directement l'utilisateur
+            if (userEmail && userName) {
+                document.getElementById('auth-nom').value = userName;
+                document.getElementById('auth-prenom').value = userPrenom;
+                document.getElementById('auth-email').value = userEmail;
+                lancerApplication();
             }
         });
 
-        /* ================= VÉRIFICATION DES ACCÈS VIA LA COLONNE `sutx` DE `app_bob` ================= */
-        async function verifierAccesEmail(silent = false) {
-            const emailInput = document.getElementById('email-auth-input').value.trim().toLowerCase();
+        /* ================= ENREGISTREMENT / VÉRIFICATION NOM, PRÉNOM, EMAIL ================= */
+        async function enregistrerConnexion() {
+            const nomInput = document.getElementById('auth-nom').value.trim();
+            const prenomInput = document.getElementById('auth-prenom').value.trim();
+            const emailInput = document.getElementById('auth-email').value.trim().toLowerCase();
             const errorEl = document.getElementById('auth-error');
 
-            if (!emailInput) {
-                if (!silent) {
-                    errorEl.textContent = "Veuillez entrer une adresse email.";
-                    errorEl.classList.remove('hidden');
-                }
+            if (!nomInput || !prenomInput || !emailInput) {
+                errorEl.textContent = "Veuillez remplir tous les champs (Nom, Prénom, Email).";
+                errorEl.classList.remove('hidden');
                 return;
             }
 
             try {
-                // On interroge la table app_bob en filtrant sur la colonne 'sutx'
-                const { data, error } = await supabaseClient
+                // Enregistrement ou mise à jour automatique dans la table app_bob (colonne sutx)
+                const { error } = await supabaseClient
                     .from('app_bob')
-                    .select('*')
-                    .eq('sutx', emailInput)
-                    .single();
+                    .upsert([
+                        { sutx: emailInput, nom: nomInput, prenom: prenomInput }
+                    ], { onConflict: 'sutx' });
 
-                if (error || !data) {
-                    throw new Error("Accès non autorisé.");
-                }
+                if (error) throw error;
 
-                // Autorisation validée
+                userName = nomInput;
+                userPrenom = prenomInput;
                 userEmail = emailInput;
-                userName = `${data.prenom || ''} ${data.nom || ''}`.trim() || emailInput;
-                localStorage.setItem('emailSutx', userEmail);
+
                 localStorage.setItem('nomSutx', userName);
+                localStorage.setItem('prenomSutx', userPrenom);
+                localStorage.setItem('emailSutx', userEmail);
 
-                document.getElementById('auth-overlay').classList.add('hidden');
-                document.getElementById('main-app').classList.remove('hidden');
-                document.getElementById('headerInfo').innerText = `👤 SUTX : ${userName}`;
-
-                // Chargement des données de suivi depuis Supabase
-                chargerDonneesSupabase();
+                lancerApplication();
 
             } catch (err) {
-                console.error("Erreur d'accès :", err);
-                if (!silent) {
-                    errorEl.textContent = "❌ Cet email n'est pas autorisé dans l'application.";
-                    errorEl.classList.remove('hidden');
-                }
-                localStorage.removeItem('emailSutx');
-                localStorage.removeItem('nomSutx');
+                console.error("Erreur d'enregistrement :", err);
+                errorEl.textContent = "❌ Erreur lors de l'enregistrement de vos informations.";
+                errorEl.classList.remove('hidden');
             }
+        }
+
+        function lancerApplication() {
+            document.getElementById('auth-overlay').classList.add('hidden');
+            document.getElementById('main-app').classList.remove('hidden');
+            document.getElementById('headerInfo').innerText = `👤 SUTX : ${userPrenom} ${userName}`;
+
+            chargerDonneesSupabase();
         }
 
         /* ================= CHARGEMENT DES DONNÉES DEPUIS SUPABASE ================= */
@@ -221,7 +223,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
                 selectChantier.innerHTML = '<option value="">Choisir...</option>';
                 chantiers.forEach(c => selectChantier.add(new Option(c, c)));
 
-                if (userName.toUpperCase().includes("LAVIGNON")) {
+                if (`${userPrenom} ${userName}`.toUpperCase().includes("LAVIGNON")) {
                     changerOnglet(2);
                 }
             } catch (err) {
@@ -343,13 +345,12 @@ const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
             containerActions.classList.remove('hidden');
         }
 
-        /* ================= SAUVEGARDE EN TEMPS RÉEL DANS SUPABASE ================= */
         async function modifierLigne(index, champ, valeur) {
             rawData[index][champ] = valeur;
             rawData[index].modifie = true;
 
             const ligne = rawData[index];
-            if (!ligne.id) return; // Si la ligne n'a pas d'ID en base, on attend l'insertion explicite
+            if (!ligne.id) return;
 
             try {
                 const updateData = {};
@@ -405,7 +406,6 @@ const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
 
                 document.getElementById('divAjoutTacheModal').classList.add('hidden');
                 rafraichirAffichageTaches();
-                console.log("Nouvelle tâche insérée dans Supabase !");
             } catch (err) {
                 console.error("Erreur d'insertion :", err);
                 alert("❌ Erreur lors de l'ajout de la tâche.");
@@ -441,7 +441,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
             }
             sessionRJ = saisiRJ;
             document.getElementById('divRJModal').classList.add('hidden');
-            document.getElementById('headerInfo').innerText = `👤 SUTX : ${userName} | 📌 RJ : ${sessionRJ}`;
+            document.getElementById('headerInfo').innerText = `👤 SUTX : ${userPrenom} ${userName} | 📌 RJ : ${sessionRJ}`;
 
             if (actionEnCours === 'pdf') {
                 genererEtPartagerPDF();
@@ -449,7 +449,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
         }
 
         async function copierDansPressePapier() {
-            const elementsFaites = rawData.filter(r => r.modifie === true && ['vrai', 'true', '1', 'true'].includes(String(r.Fait).toLowerCase().trim()));
+            const elementsFaites = rawData.filter(r => r.modifie === true && ['vrai', 'true', '1'].includes(String(r.Fait).toLowerCase().trim()));
 
             if (elementsFaites.length === 0) {
                 alert("Aucun travail validé (coché fait) n'a été trouvé pour la copie.");
@@ -504,7 +504,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
 
             doc.setTextColor(50, 50, 50);
             doc.setFontSize(11);
-            doc.text(`Opérateur SUTX : ${userName}`, 14, 35);
+            doc.text(`Opérateur SUTX : ${userPrenom} ${userName}`, 14, 35);
             doc.text(`Numéro RJ : ${sessionRJ}`, 14, 42);
             doc.text(`Date d'envoi : ${dateEnvoi}`, 14, 49);
 
@@ -531,7 +531,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
                     await navigator.share({
                         files: [file],
                         title: 'Rapport Suivi Travaux',
-                        text: `Bonjour, voici le rapport de suivi des travaux pour le RJ ${sessionRJ}.\nOpérateur : ${userName}`
+                        text: `Bonjour, voici le rapport de suivi des travaux pour le RJ ${sessionRJ}.\nOpérateur : ${userPrenom} ${userName}`
                     });
                     return;
                 }
@@ -555,13 +555,13 @@ const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
 
             doc.setTextColor(50, 50, 50);
             doc.setFontSize(11);
-            doc.text(`Opérateur : ${userName}`, 14, 35);
+            doc.text(`Opérateur : ${userPrenom} ${userName}`, 14, 35);
 
             const tableColumns = ["Chantier", "Tâches Réalisées", "Total Tâches", "Avancement"];
             const tableRows = chantiers.map(chantier => {
                 const lignes = rawData.filter(r => r.Chantier === chantier);
                 const total = lignes.length;
-                const faites = lignes.filter(r => ['vrai', 'true', '1', 'true'].includes(String(r.Fait).toLowerCase().trim())).length;
+                const faites = lignes.filter(r => ['vrai', 'true', '1'].includes(String(r.Fait).toLowerCase().trim())).length;
                 const pct = total > 0 ? Math.round((faites / total) * 100) : 0;
                 return [chantier, faites, total, `${pct}%`];
             });
@@ -584,7 +584,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
                     await navigator.share({
                         files: [file],
                         title: 'Avancement Chantiers',
-                        text: `Bonjour, voici le bilan d'avancement global des chantiers.\nOpérateur : ${userName}`
+                        text: `Bonjour, voici le bilan d'avancement global des chantiers.\nOpérateur : ${userPrenom} ${userName}`
                     });
                     return;
                 }
