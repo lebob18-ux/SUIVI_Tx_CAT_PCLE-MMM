@@ -180,17 +180,35 @@ async function enregistrerConnexion() {
     }
 
     try {
-        console.log("Tentative d'enregistrement avec :", { sutx: emailInput, nom: nomInput, prenom: prenomInput });
-
-        const { data, error } = await supabaseClient
+        // 1. On vérifie si l'email existe déjà dans app_bob
+        const { data: existingUser, error: searchError } = await supabaseClient
             .from('app_bob')
-            .upsert([
-                { sutx: emailInput, nom: nomInput, prenom: prenomInput }
-            ], { onConflict: 'sutx' });
+            .select('*')
+            .eq('email', emailInput)
+            .maybeSingle();
 
-        if (error) {
-            console.error("Détail complet de l'erreur Supabase :", error);
-            throw error;
+        if (searchError) throw searchError;
+
+        // 2. Si l'utilisateur n'existe pas encore, on le crée avec sutx à false par défaut
+        if (!existingUser) {
+            const { error: insertError } = await supabaseClient
+                .from('app_bob')
+                .insert([
+                    { 
+                        email: emailInput, 
+                        nom: nomInput, 
+                        prenom: prenomInput, 
+                        sutx: false // bloqué par défaut jusqu'à ton accord
+                    }
+                ]);
+
+            if (insertError) throw insertError;
+        } else {
+            // S'il existe déjà, on met juste à jour son nom/prénom si besoin sans toucher à son accès sutx
+            await supabaseClient
+                .from('app_bob')
+                .update({ nom: nomInput, prenom: prenomInput })
+                .eq('email', emailInput);
         }
 
         userName = nomInput;
@@ -204,13 +222,11 @@ async function enregistrerConnexion() {
         lancerApplication();
 
     } catch (err) {
-        console.error("Erreur attrapée :", err);
-        // Affiche l'erreur exacte de Supabase directement à l'écran pour qu'on sache quoi corriger
-        errorEl.textContent = `❌ Erreur : ${err.message || JSON.stringify(err)}`;
+        console.error("Erreur d'enregistrement :", err);
+        errorEl.textContent = `❌ Erreur : ${err.message}`;
         errorEl.classList.remove('hidden');
     }
 }
-
         function lancerApplication() {
             document.getElementById('auth-overlay').classList.add('hidden');
             document.getElementById('main-app').classList.remove('hidden');
