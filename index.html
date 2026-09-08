@@ -167,43 +167,49 @@ const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
             }
         });
 
-        async function enregistrerConnexion() {
-            const nomInput = document.getElementById('auth-nom').value.trim();
-            const prenomInput = document.getElementById('auth-prenom').value.trim();
-            const emailInput = document.getElementById('auth-email').value.trim().toLowerCase();
-            const errorEl = document.getElementById('auth-error');
+async function enregistrerConnexion() {
+    const nomInput = document.getElementById('auth-nom').value.trim();
+    const prenomInput = document.getElementById('auth-prenom').value.trim();
+    const emailInput = document.getElementById('auth-email').value.trim().toLowerCase();
+    const errorEl = document.getElementById('auth-error');
 
-            if (!nomInput || !prenomInput || !emailInput) {
-                errorEl.textContent = "Veuillez remplir tous les champs (Nom, Prénom, Email).";
-                errorEl.classList.remove('hidden');
-                return;
-            }
+    if (!nomInput || !prenomInput || !emailInput) {
+        errorEl.textContent = "Veuillez remplir tous les champs (Nom, Prénom, Email).";
+        errorEl.classList.remove('hidden');
+        return;
+    }
 
-            try {
-                const { error } = await supabaseClient
-                    .from('app_bob')
-                    .upsert([
-                        { sutx: emailInput, nom: nomInput, prenom: prenomInput }
-                    ], { onConflict: 'sutx' });
+    try {
+        console.log("Tentative d'enregistrement avec :", { sutx: emailInput, nom: nomInput, prenom: prenomInput });
 
-                if (error) throw error;
+        const { data, error } = await supabaseClient
+            .from('app_bob')
+            .upsert([
+                { sutx: emailInput, nom: nomInput, prenom: prenomInput }
+            ], { onConflict: 'sutx' });
 
-                userName = nomInput;
-                userPrenom = prenomInput;
-                userEmail = emailInput;
-
-                localStorage.setItem('nomSutx', userName);
-                localStorage.setItem('prenomSutx', userPrenom);
-                localStorage.setItem('emailSutx', userEmail);
-
-                lancerApplication();
-
-            } catch (err) {
-                console.error("Erreur d'enregistrement :", err);
-                errorEl.textContent = "❌ Erreur lors de l'enregistrement de vos informations.";
-                errorEl.classList.remove('hidden');
-            }
+        if (error) {
+            console.error("Détail complet de l'erreur Supabase :", error);
+            throw error;
         }
+
+        userName = nomInput;
+        userPrenom = prenomInput;
+        userEmail = emailInput;
+
+        localStorage.setItem('nomSutx', userName);
+        localStorage.setItem('prenomSutx', userPrenom);
+        localStorage.setItem('emailSutx', userEmail);
+
+        lancerApplication();
+
+    } catch (err) {
+        console.error("Erreur attrapée :", err);
+        // Affiche l'erreur exacte de Supabase directement à l'écran pour qu'on sache quoi corriger
+        errorEl.textContent = `❌ Erreur : ${err.message || JSON.stringify(err)}`;
+        errorEl.classList.remove('hidden');
+    }
+}
 
         function lancerApplication() {
             document.getElementById('auth-overlay').classList.add('hidden');
