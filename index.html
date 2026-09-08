@@ -15,9 +15,24 @@
     <!-- jsPDF et AutoTable pour un PDF pro -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+    <!-- SDK Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="bg-gray-100 p-4 min-h-screen">
-    <div class="max-w-4xl mx-auto bg-white rounded-xl shadow-md p-6">
+
+    <!-- ÉCRAN DE CONNEXION / DEMANDE D'ACCÈS -->
+    <div id="auth-overlay" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+        <div class="bg-white p-6 rounded-xl shadow-xl w-full max-w-sm text-center">
+            <h2 class="text-xl font-bold text-gray-800 mb-2">🔐 Contrôle d'accès SUTX</h2>
+            <p class="text-xs text-gray-600 mb-4">Entrez votre adresse email pour vérifier vos droits d'accès.</p>
+            <input type="email" id="email-auth-input" placeholder="votre.email@sncf.fr" class="w-full p-2.5 border rounded-lg mb-3 text-sm focus:ring-2 focus:ring-blue-500">
+            <button onclick="verifierAccesEmail()" class="w-full bg-blue-600 hover:bg-blue-700 text-white p-2.5 rounded-lg font-bold text-sm shadow transition">Se connecter</button>
+            <p id="auth-error" class="text-red-500 text-xs mt-3 hidden"></p>
+        </div>
+    </div>
+
+    <!-- CONTENU PRINCIPAL (Masqué tant que l'accès n'est pas validé) -->
+    <div id="main-app" class="max-w-4xl mx-auto bg-white rounded-xl shadow-md p-6 hidden">
         
         <!-- Barre des onglets de navigation -->
         <div class="flex gap-2 mb-6 border-b pb-4">
@@ -106,7 +121,7 @@
     <div id="divAjoutTacheModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div class="bg-white p-6 rounded-xl shadow-lg w-90 max-w-sm">
             <p class="font-bold text-lg mb-2 text-gray-800 text-center">➕ Ajouter un travail non prévu</p>
-            <p class="text-xs text-gray-600 mb-4 text-center">Ce travail n'aura pas d'ID (le VBA devra l'ajouter à la base globale).</p>
+            <p class="text-xs text-gray-600 mb-4 text-center">Ce travail sera enregistré directement dans Supabase.</p>
             <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Intitulé de la tâche :</label>
             <input type="text" id="inputNouvelleTache" placeholder="Ex: Reprise fondation spécifique..." class="w-full p-2.5 border rounded-lg mb-4 text-sm focus:ring-2 focus:ring-blue-500">
             <div class="flex gap-2">
@@ -117,8 +132,14 @@
     </div>
 
     <script>
+        /* ================= CONFIGURATION SUPABASE ================= */
+        const SUPABASE_URL = "TON_URL_SUPABASE";
+        const SUPABASE_ANON_KEY = "TA_CLE_ANON_SUPABASE";
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
         let rawData = [];
         let sessionRJ = "";
+        let userEmail = localStorage.getItem('emailSutx') || "";
         let userName = localStorage.getItem('nomSutx') || "";
         let actionEnCours = null;
 
@@ -127,27 +148,87 @@
                 navigator.serviceWorker.register('sw.js').catch(console.error);
             }
 
-            if (!userName) {
-                userName = prompt("Entrez votre Nom/Prénom :") || "Inconnu";
-                localStorage.setItem('nomSutx', userName);
+            // Si un email est déjà stocké, on tente de le reconnecter directement
+            if (userEmail) {
+                document.getElementById('email-auth-input').value = userEmail;
+                verifierAccesEmail(true);
             }
-            
-            document.getElementById('headerInfo').innerText = `👤 SUTX : ${userName}`;
-
-            Papa.parse("data_tx_cat.csv", {
-                download: true, header: true, delimiter: ";", skipEmptyLines: true,
-                complete: (results) => {
-                    rawData = results.data.map(r => ({ ...r, modifie: false, isCustom: false }));
-                    const chantiers = [...new Set(rawData.map(r => r.Chantier))].filter(Boolean);
-                    const selectChantier = document.getElementById('selectChantier');
-                    chantiers.forEach(c => selectChantier.add(new Option(c, c)));
-
-                    if (userName.toUpperCase().includes("LAVIGNON")) {
-                        changerOnglet(2);
-                    }
-                }
-            });
         });
+
+        /* ================= VÉRIFICATION DES ACCÈS VIA `app_bob` ================= */
+        async function verifierAccesEmail(silent = false) {
+            const emailInput = document.getElementById('email-auth-input').value.trim().toLowerCase();
+            const errorEl = document.getElementById('auth-error');
+
+            if (!emailInput) {
+                if (!silent) {
+                    errorEl.textContent = "Veuillez entrer une adresse email.";
+                    errorEl.classList.remove('hidden');
+                }
+                return;
+            }
+
+            try {
+                // On interroge la table app_bob pour vérifier si l'email existe
+                const { data, error } = await supabaseClient
+                    .from('app_bob')
+                    .select('*')
+                    .eq('email', emailInput)
+                    .single();
+
+                if (error || !data) {
+                    throw new Error("Accès non autorisé.");
+                }
+
+                // Autorisation validée
+                userEmail = emailInput;
+                userName = `${data.prenom || ''} ${data.nom || ''}`.trim() || emailInput;
+                localStorage.setItem('emailSutx', userEmail);
+                localStorage.setItem('nomSutx', userName);
+
+                document.getElementById('auth-overlay').classList.add('hidden');
+                document.getElementById('main-app').classList.remove('hidden');
+                document.getElementById('headerInfo').innerText = `👤 SUTX : ${userName}`;
+
+                // Chargement des données de suivi depuis Supabase
+                chargerDonneesSupabase();
+
+            } catch (err) {
+                console.error("Erreur d'accès :", err);
+                if (!silent) {
+                    errorEl.textContent = "❌ Cet email n'est pas autorisé dans l'application.";
+                    errorEl.classList.remove('hidden');
+                }
+                localStorage.removeItem('emailSutx');
+                localStorage.removeItem('nomSutx');
+            }
+        }
+
+        /* ================= CHARGEMENT DES DONNÉES DEPUIS SUPABASE ================= */
+        async function chargerDonneesSupabase() {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('suivi_tx_cat')
+                    .select('*')
+                    .range(0, 9999);
+
+                if (error) throw error;
+
+                rawData = (data || []).map(r => ({ ...r, modifie: false, isCustom: false }));
+                
+                const chantiers = [...new Set(rawData.map(r => r.Chantier))].filter(Boolean);
+                const selectChantier = document.getElementById('selectChantier');
+                selectChantier.innerHTML = '<option value="">Choisir...</option>';
+                chantiers.forEach(c => selectChantier.add(new Option(c, c)));
+
+                if (userName.toUpperCase().includes("LAVIGNON")) {
+                    changerOnglet(2);
+                }
+            } catch (err) {
+                console.error("Erreur de chargement des tâches :", err);
+                alert("Erreur lors du chargement des données de chantier.");
+            }
+        }
 
         function changerOnglet(numPage) {
             const page1 = document.getElementById('page1');
@@ -246,13 +327,13 @@
                 div.className = `p-3 border rounded-lg flex items-center gap-3 ${item.isCustom ? 'bg-amber-50 border-amber-200' : 'bg-gray-50'}`;
                 div.innerHTML = `
                     <input type="checkbox" ${isChecked ? 'checked' : ''} 
-                        onchange="modifierLigne(${indexGlobal}, 'Fait', this.checked ? 'Vrai' : 'Faux')" 
+                        onchange="modifierLigne(${indexGlobal}, 'Fait', this.checked)" 
                         class="w-6 h-6 text-blue-600 rounded cursor-pointer">
                     <div class="flex-1 text-sm font-medium text-gray-800">
-                        ${item.Tache} ${item.isCustom ? '<span class="text-xs bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded font-bold ml-2">Hors CSV (Sans ID)</span>' : ''}
+                        ${item.Tache} ${item.isCustom ? '<span class="text-xs bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded font-bold ml-2">Ajout manuel</span>' : ''}
                     </div>
                     <input type="text" value="${item.Observation || ''}" placeholder="Observation..." 
-                        oninput="modifierLigne(${indexGlobal}, 'Observation', this.value)" 
+                        onchange="modifierLigne(${indexGlobal}, 'Observation', this.value)" 
                         class="w-1/3 p-1.5 text-sm border rounded bg-white focus:ring-2 focus:ring-blue-500">
                 `;
                 containerTaches.appendChild(div);
@@ -262,17 +343,37 @@
             containerActions.classList.remove('hidden');
         }
 
-        window.modifierLigne = function(index, champ, valeur) {
+        /* ================= SAUVEGARDE EN TEMPS RÉEL DANS SUPABASE ================= */
+        async function modifierLigne(index, champ, valeur) {
             rawData[index][champ] = valeur;
             rawData[index].modifie = true;
-        };
+
+            const ligne = rawData[index];
+            if (!ligne.id) return; // Si la ligne n'a pas d'ID en base, on attend l'insertion explicite
+
+            try {
+                const updateData = {};
+                updateData[champ] = valeur;
+
+                const { error } = await supabaseClient
+                    .from('suivi_tx_cat')
+                    .update(updateData)
+                    .eq('id', ligne.id);
+
+                if (error) throw error;
+                console.log(`Mise à jour Supabase validée pour la ligne ID ${ligne.id}`);
+            } catch (err) {
+                console.error("Erreur de mise à jour Supabase :", err);
+                alert("❌ Erreur lors de l'enregistrement en base de données.");
+            }
+        }
 
         function ouvrirModalAjoutTache() {
             document.getElementById('inputNouvelleTache').value = '';
             document.getElementById('divAjoutTacheModal').classList.remove('hidden');
         }
 
-        function validerAjoutTacheManuelle() {
+        async function validerAjoutTacheManuelle() {
             const intitule = document.getElementById('inputNouvelleTache').value.trim();
             const chantierChoisi = selectChantier.value;
             const supportChoisi = selectSupport.value;
@@ -282,20 +383,33 @@
                 return;
             }
 
-            const nouvelleLigne = {
-                ID: "", 
-                Chantier: chantierChoisi,
-                Support: supportChoisi,
-                Tache: intitule,
-                Fait: "Vrai",
-                Observation: "Travail non prévu ajouté manuellement",
-                modifie: true,
-                isCustom: true
-            };
+            try {
+                const nouvelleLigne = {
+                    Chantier: chantierChoisi,
+                    Support: supportChoisi,
+                    Tache: intitule,
+                    Fait: true,
+                    Observation: "Travail non prévu ajouté manuellement"
+                };
 
-            rawData.push(nouvelleLigne);
-            document.getElementById('divAjoutTacheModal').classList.add('hidden');
-            rafraichirAffichageTaches();
+                const { data, error } = await supabaseClient
+                    .from('suivi_tx_cat')
+                    .insert([nouvelleLigne])
+                    .select();
+
+                if (error) throw error;
+
+                if (data && data.length > 0) {
+                    rawData.push({ ...data[0], modifie: true, isCustom: true });
+                }
+
+                document.getElementById('divAjoutTacheModal').classList.add('hidden');
+                rafraichirAffichageTaches();
+                console.log("Nouvelle tâche insérée dans Supabase !");
+            } catch (err) {
+                console.error("Erreur d'insertion :", err);
+                alert("❌ Erreur lors de l'ajout de la tâche.");
+            }
         }
 
         document.getElementById('btnSharePDF').addEventListener('click', () => {
@@ -334,16 +448,14 @@
             }
         }
 
-        // Copie optimisée : Support, Tâches faites et Observations associées
         async function copierDansPressePapier() {
-            const elementsFaites = rawData.filter(r => r.modifie === true && ['vrai', 'true', '1'].includes(String(r.Fait).toLowerCase().trim()));
+            const elementsFaites = rawData.filter(r => r.modifie === true && ['vrai', 'true', '1', 'true'].includes(String(r.Fait).toLowerCase().trim()));
 
             if (elementsFaites.length === 0) {
                 alert("Aucun travail validé (coché fait) n'a été trouvé pour la copie.");
                 return;
             }
 
-            // Grouper par Support
             const supportsGrouper = {};
             elementsFaites.forEach(r => {
                 const support = r.Support || "Support inconnu";
@@ -356,7 +468,6 @@
                 });
             });
 
-            // Construction du texte récapitulatif avec les observations
             let texteFinal = "";
             for (const [support, items] of Object.entries(supportsGrouper)) {
                 texteFinal += `Support : ${support}\n`;
@@ -372,7 +483,7 @@
 
             try {
                 await navigator.clipboard.writeText(texteFinal.trim());
-                alert("✅ Récapitulatif (avec observations) copié dans le presse-papiers !\n\nVous pouvez le coller (Ctrl+V) dans votre autre application.");
+                alert("✅ Récapitulatif copié dans le presse-papiers !");
             } catch (err) {
                 console.error("Erreur de copie : ", err);
                 alert("Erreur lors de la copie automatique.");
@@ -399,7 +510,7 @@
 
             const tableColumns = ["ID", "Chantier", "Support", "Tache", "Fait", "Observation"];
             const tableRows = elementsModifies.map(r => [
-                r.ID || "SANS ID", r.Chantier, r.Support, r.Tache, r.Fait, r.Observation
+                r.id || "SANS ID", r.Chantier, r.Support, r.Tache, r.Fait ? "Oui" : "Non", r.Observation
             ]);
 
             doc.autoTable({
@@ -408,12 +519,7 @@
                 body: tableRows,
                 theme: 'grid',
                 headStyles: { fillColor: [37, 99, 235], textColor: [255, 255, 255] },
-                styles: { fontSize: 9, cellPadding: 3 },
-                didParseCell: function(data) {
-                    if (data.row.raw[0] === "SANS ID") {
-                        data.cell.styles.fillColor = [254, 243, 199];
-                    }
-                }
+                styles: { fontSize: 9, cellPadding: 3 }
             });
 
             const pdfOutput = doc.output('blob');
@@ -455,7 +561,7 @@
             const tableRows = chantiers.map(chantier => {
                 const lignes = rawData.filter(r => r.Chantier === chantier);
                 const total = lignes.length;
-                const faites = lignes.filter(r => ['vrai', 'true', '1'].includes(String(r.Fait).toLowerCase().trim())).length;
+                const faites = lignes.filter(r => ['vrai', 'true', '1', 'true'].includes(String(r.Fait).toLowerCase().trim())).length;
                 const pct = total > 0 ? Math.round((faites / total) * 100) : 0;
                 return [chantier, faites, total, `${pct}%`];
             });
