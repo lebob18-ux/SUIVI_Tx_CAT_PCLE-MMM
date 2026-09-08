@@ -41,7 +41,7 @@
             <button id="tabPage1" onclick="changerOnglet(1)" class="flex-1 py-2 px-4 rounded-lg font-bold text-sm bg-blue-600 text-white shadow transition">
                 📋 Saisie & Suivi
             </button>
-            <button id="tabPage2" onclick="changerOnglet(2)" class="flex-1 py-2 px-4 rounded-lg font-bold text-sm bg-gray-200 text-gray-700 hover:bg-gray-300 transition">
+            <button id="tabPage2" onclick="changerOnglet(2)" class="flex-1 py-2 px-4 rounded-lg font-bold text-sm bg-gray-200 text-gray-700 hover:bg-gray-300 transition hidden">
                 📊 Avancement Chantiers
             </button>
         </div>
@@ -121,7 +121,7 @@
             <input type="text" id="rjInput" placeholder="Numéro RJ" class="w-full p-2 border rounded-lg mb-4 text-center font-bold focus:ring-2 focus:ring-blue-500">
             <div class="flex gap-2">
                 <button onclick="executerActionEnAttente()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-lg font-bold text-sm">✅ Valider</button>
-                <button onclick="document.getElementById('divRJModal').classList.add('hidden')" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 p-2 rounded-lg font-bold text-sm">❌ Annuler</button>
+                <button onclick="document.getElementById('divRJModal').classList.add('hidden')" class="flex1 bg-gray-200 hover:bg-gray-300 text-gray-800 p-2 rounded-lg font-bold text-sm">❌ Annuler</button>
             </div>
         </div>
     </div>
@@ -152,6 +152,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
         let userEmail = localStorage.getItem('emailSutx') || "";
         let userName = localStorage.getItem('nomSutx') || "";
         let userPrenom = localStorage.getItem('prenomSutx') || "";
+        let userAdmin = false;
         let actionEnCours = null;
 
         window.addEventListener('DOMContentLoaded', () => {
@@ -163,74 +164,116 @@ const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
                 document.getElementById('auth-nom').value = userName;
                 document.getElementById('auth-prenom').value = userPrenom;
                 document.getElementById('auth-email').value = userEmail;
-                lancerApplication();
+                verifierAccesEtLancer();
             }
         });
 
-async function enregistrerConnexion() {
-    const nomInput = document.getElementById('auth-nom').value.trim();
-    const prenomInput = document.getElementById('auth-prenom').value.trim();
-    const emailInput = document.getElementById('auth-email').value.trim().toLowerCase();
-    const errorEl = document.getElementById('auth-error');
+        async function enregistrerConnexion() {
+            const nomInput = document.getElementById('auth-nom').value.trim();
+            const prenomInput = document.getElementById('auth-prenom').value.trim();
+            const emailInput = document.getElementById('auth-email').value.trim().toLowerCase();
+            const errorEl = document.getElementById('auth-error');
 
-    if (!nomInput || !prenomInput || !emailInput) {
-        errorEl.textContent = "Veuillez remplir tous les champs (Nom, Prénom, Email).";
-        errorEl.classList.remove('hidden');
-        return;
-    }
+            if (!nomInput || !prenomInput || !emailInput) {
+                errorEl.textContent = "Veuillez remplir tous les champs (Nom, Prénom, Email).";
+                errorEl.classList.remove('hidden');
+                return;
+            }
 
-    try {
-        // 1. On vérifie si l'email existe déjà dans app_bob
-        const { data: existingUser, error: searchError } = await supabaseClient
-            .from('app_bob')
-            .select('*')
-            .eq('email', emailInput)
-            .maybeSingle();
+            try {
+                // 1. Vérifier si l'utilisateur existe déjà dans app_bob
+                let { data: userRecord, error: searchError } = await supabaseClient
+                    .from('app_bob')
+                    .select('*')
+                    .eq('email', emailInput)
+                    .maybeSingle();
 
-        if (searchError) throw searchError;
+                if (searchError) throw searchError;
 
-        // 2. Si l'utilisateur n'existe pas encore, on le crée avec sutx à false par défaut
-        if (!existingUser) {
-            const { error: insertError } = await supabaseClient
-                .from('app_bob')
-                .insert([
-                    { 
-                        email: emailInput, 
-                        nom: nomInput, 
-                        prenom: prenomInput, 
-                        sutx: false // bloqué par défaut jusqu'à ton accord
-                    }
-                ]);
+                // 2. Si l'utilisateur n'existe pas, on le crée avec les accès à false par défaut
+                if (!userRecord) {
+                    const { data: newRecord, error: insertError } = await supabaseClient
+                        .from('app_bob')
+                        .insert([
+                            { email: emailInput, nom: nomInput, prenom: prenomInput, sutx: false, admin: false }
+                        ])
+                        .select()
+                        .maybeSingle();
 
-            if (insertError) throw insertError;
-        } else {
-            // S'il existe déjà, on met juste à jour son nom/prénom si besoin sans toucher à son accès sutx
-            await supabaseClient
-                .from('app_bob')
-                .update({ nom: nomInput, prenom: prenomInput })
-                .eq('email', emailInput);
+                    if (insertError) throw insertError;
+                    userRecord = newRecord;
+                } else {
+                    // Mettre à jour le nom/prénom si besoin
+                    await supabaseClient
+                        .from('app_bob')
+                        .update({ nom: nomInput, prenom: prenomInput })
+                        .eq('email', emailInput);
+                }
+
+                // 3. Vérification de l'autorisation SUTX
+                if (!userRecord || userRecord.sutx !== true) {
+                    errorEl.textContent = "❌ Accès non autorisé. Veuillez contacter l'administrateur pour activer votre accès SUTX.";
+                    errorEl.classList.remove('hidden');
+                    return;
+                }
+
+                userName = nomInput;
+                userPrenom = prenomInput;
+                userEmail = emailInput;
+                userAdmin = userRecord.admin === true;
+
+                localStorage.setItem('nomSutx', userName);
+                localStorage.setItem('prenomSutx', userPrenom);
+                localStorage.setItem('emailSutx', userEmail);
+
+                lancerApplication();
+
+            } catch (err) {
+                console.error("Erreur de connexion :", err);
+                errorEl.textContent = `❌ Erreur : ${err.message || "Impossible de vérifier l'accès."}`;
+                errorEl.classList.remove('hidden');
+            }
         }
 
-        userName = nomInput;
-        userPrenom = prenomInput;
-        userEmail = emailInput;
+        async function verifierAccesEtLancer() {
+            try {
+                const { data: userRecord, error } = await supabaseClient
+                    .from('app_bob')
+                    .select('*')
+                    .eq('email', userEmail)
+                    .maybeSingle();
 
-        localStorage.setItem('nomSutx', userName);
-        localStorage.setItem('prenomSutx', userPrenom);
-        localStorage.setItem('emailSutx', userEmail);
+                if (error || !userRecord || userRecord.sutx !== true) {
+                    // Accès révoqué ou utilisateur introuvable
+                    localStorage.clear();
+                    document.getElementById('auth-overlay').classList.remove('hidden');
+                    document.getElementById('main-app').classList.add('hidden');
+                    if (userRecord && userRecord.sutx !== true) {
+                        const errorEl = document.getElementById('auth-error');
+                        errorEl.textContent = "❌ Votre accès SUTX a été désactivé.";
+                        errorEl.classList.remove('hidden');
+                    }
+                    return;
+                }
 
-        lancerApplication();
+                userAdmin = userRecord.admin === true;
+                lancerApplication();
+            } catch (err) {
+                console.error("Erreur de vérification :", err);
+            }
+        }
 
-    } catch (err) {
-        console.error("Erreur d'enregistrement :", err);
-        errorEl.textContent = `❌ Erreur : ${err.message}`;
-        errorEl.classList.remove('hidden');
-    }
-}
         function lancerApplication() {
             document.getElementById('auth-overlay').classList.add('hidden');
             document.getElementById('main-app').classList.remove('hidden');
             document.getElementById('headerInfo').innerText = `👤 SUTX : ${userPrenom} ${userName}`;
+
+            // Afficher l'onglet d'avancement uniquement si admin est true
+            if (userAdmin) {
+                document.getElementById('tabPage2').classList.remove('hidden');
+            } else {
+                document.getElementById('tabPage2').classList.add('hidden');
+            }
 
             chargerDonneesSupabase();
         }
@@ -250,10 +293,6 @@ async function enregistrerConnexion() {
                 const selectChantier = document.getElementById('selectChantier');
                 selectChantier.innerHTML = '<option value="">Choisir...</option>';
                 chantiers.forEach(c => selectChantier.add(new Option(c, c)));
-
-                if (`${userPrenom} ${userName}`.toUpperCase().includes("LAVIGNON")) {
-                    changerOnglet(2);
-                }
             } catch (err) {
                 console.error("Erreur de chargement des tâches :", err);
                 alert("Erreur lors du chargement des données de chantier.");
@@ -261,6 +300,11 @@ async function enregistrerConnexion() {
         }
 
         function changerOnglet(numPage) {
+            if (numPage === 2 && !userAdmin) {
+                alert("Accès réservé aux administrateurs.");
+                return;
+            }
+
             const page1 = document.getElementById('page1');
             const page2 = document.getElementById('page2');
             const tab1 = document.getElementById('tabPage1');
@@ -601,6 +645,8 @@ async function enregistrerConnexion() {
         }
 
         async function partagerPDFAvancement() {
+            if (!userAdmin) return;
+
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
             const chantiers = [...new Set(rawData.map(r => r.Chantier))].filter(Boolean);
