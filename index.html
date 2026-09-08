@@ -155,7 +155,7 @@
             }
         });
 
-        /* ================= VÉRIFICATION DES ACCÈS VIA `app_bob` ================= */
+        /* ================= VÉRIFICATION DES ACCÈS VIA LA COLONNE `sutx` DE `app_bob` ================= */
         async function verifierAccesEmail(silent = false) {
             const emailInput = document.getElementById('email-auth-input').value.trim().toLowerCase();
             const errorEl = document.getElementById('auth-error');
@@ -169,11 +169,11 @@
             }
 
             try {
-                // On interroge la table app_bob pour vérifier si l'email existe
+                // On interroge la table app_bob en filtrant sur la colonne 'sutx'
                 const { data, error } = await supabaseClient
                     .from('app_bob')
                     .select('*')
-                    .eq('email', emailInput)
+                    .eq('sutx', emailInput)
                     .single();
 
                 if (error || !data) {
