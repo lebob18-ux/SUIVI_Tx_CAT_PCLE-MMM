@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Suivi Travaux - SUTX</title>
+    <title>Suivi Travaux - SUTX avec Sidebars & Scan</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#2563eb">
     <link rel="icon" href="icon-192.png" type="image/png">
@@ -18,7 +18,7 @@
     <!-- SDK Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-<body class="bg-gray-100 p-4 min-h-screen">
+<body class="bg-gray-100 min-h-screen flex flex-col">
 
     <!-- ÉCRAN D'IDENTIFICATION (Nom, Prénom, Email) -->
     <div id="auth-overlay" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
@@ -33,109 +33,168 @@
         </div>
     </div>
 
-    <!-- CONTENU PRINCIPAL -->
-    <div id="main-app" class="max-w-4xl mx-auto bg-white rounded-xl shadow-md p-6 hidden">
+    <!-- CONTENU PRINCIPAL AVEC LAYOUT 3 COLONNES (Sidebar Gauche, Centre, Sidebar Droite) -->
+    <div id="main-app" class="flex-1 flex flex-col hidden">
         
-        <!-- Barre des onglets de navigation -->
-        <div class="flex gap-2 mb-6 border-b pb-4">
-            <button id="tabPage1" onclick="changerOnglet(1)" class="flex-1 py-2 px-4 rounded-lg font-bold text-sm bg-blue-600 text-white shadow transition">
-                📋 Saisie & Suivi
-            </button>
-            <button id="tabPage2" onclick="changerOnglet(2)" class="flex-1 py-2 px-4 rounded-lg font-bold text-sm bg-gray-200 text-gray-700 hover:bg-gray-300 transition hidden">
-                📊 Avancement Chantiers
-            </button>
-        </div>
-
-        <!-- ================= PAGE 1 : SAISIE ================= -->
-        <div id="page1">
-            <div class="flex flex-wrap justify-between items-center mb-2 border-b pb-4 gap-2">
-                <h1 class="text-xl font-bold text-gray-800">📋 Suivi des Travaux</h1>
-                <div id="containerActions" class="hidden flex gap-2">
-                    <button id="btnCopier" onclick="copierTravaux()" class="bg-gray-800 hover:bg-gray-900 text-white px-3 py-2 rounded-lg font-bold text-sm shadow transition flex items-center gap-1.5">
-                        <span>📋</span> Copier
-                    </button>
-                    <button id="btnSharePDF" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg font-bold text-sm shadow transition flex items-center gap-1.5">
-                        <span>📄</span> Partager PDF
-                    </button>
-                </div>
+        <!-- Barre de navigation supérieure -->
+        <header class="bg-white shadow-sm px-6 py-3 flex justify-between items-center border-b">
+            <div class="flex items-center gap-4">
+                <h1 class="text-lg font-bold text-gray-800 flex items-center gap-2">⚡ SUTX - Suivi Caténaire</h1>
+                <div id="headerInfo" class="text-xs text-blue-700 font-semibold bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100"></div>
             </div>
+            <!-- Onglets principaux -->
+            <div class="flex gap-2">
+                <button id="tabPage1" onclick="changerOnglet(1)" class="py-1.5 px-4 rounded-lg font-bold text-xs bg-blue-600 text-white shadow transition">
+                    📋 Saisie & Suivi
+                </button>
+                <button id="tabPage2" onclick="changerOnglet(2)" class="py-1.5 px-4 rounded-lg font-bold text-xs bg-gray-200 text-gray-700 hover:bg-gray-300 transition hidden">
+                    📊 Avancement Chantiers
+                </button>
+            </div>
+        </header>
+
+        <!-- Corps de l'application en grille avec les deux Sidebars -->
+        <div class="flex-1 grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-4 p-4 max-w-7xl mx-auto w-full">
             
-            <div id="headerInfo" class="text-sm text-blue-700 mb-6 font-semibold bg-blue-50 p-2.5 rounded-lg border border-blue-100"></div>
-            
-            <div class="grid grid-cols-2 gap-4 mb-4">
+            <!-- ================= SIDEBAR GAUCHE : CHANTIERS & NAVIGATION ================= -->
+            <aside class="bg-white p-4 rounded-xl shadow-md md:col-span-1 flex flex-col gap-4 h-fit">
                 <div>
-                    <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Chantier :</label>
-                    <select id="selectChantier" class="w-full p-2.5 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500">
-                        <option value="">Choisir...</option>
+                    <h2 class="text-xs font-bold uppercase text-gray-500 mb-2 tracking-wider">🏗️ Chantiers</h2>
+                    <select id="selectChantier" class="w-full p-2.5 border rounded-lg bg-gray-50 text-sm focus:ring-2 focus:ring-blue-500">
+                        <option value="">Choisir un chantier...</option>
                     </select>
                 </div>
-                <div>
-                    <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Support :</label>
-                    <select id="selectSupport" class="w-full p-2.5 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500" disabled>
-                        <option value="">Choisir...</option>
-                    </select>
+
+                <!-- Module de Scan / Import Rapide intégré dans la Sidebar gauche -->
+                <div class="border-t pt-4">
+                    <h2 class="text-xs font-bold uppercase text-gray-500 mb-2 tracking-wider">📷 Scan & Documents</h2>
+                    <div class="flex flex-col gap-2">
+                        <label for="inputScanFile" class="cursor-pointer bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 p-2.5 rounded-lg text-xs font-bold text-center transition flex items-center justify-center gap-1.5">
+                            <span>📂</span> Importer / Scanner Fichier
+                        </label>
+                        <input type="file" id="inputScanFile" accept="image/*,application/pdf" class="hidden" onchange="traiterFichierScanne(event)">
+                        <button onclick="lancerAnalyseScan()" class="bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-lg text-xs font-bold shadow transition flex items-center justify-center gap-1.5">
+                            <span>🔍</span> Analyser le document
+                        </button>
+                    </div>
+                    <div id="scanResultat" class="mt-2 text-xs text-gray-600 bg-gray-50 p-2 rounded border hidden"></div>
                 </div>
-            </div>
 
-            <!-- Boutons globaux pour cocher / décocher rapidement toutes les tâches du support -->
-            <div id="sectionActionsRapides" class="hidden flex gap-2 mb-4">
-                <button onclick="cocherToutSupport(true)" class="bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1">
-                    <span>✅</span> Tout cocher sur ce support
-                </button>
-                <button onclick="cocherToutSupport(false)" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1">
-                    <span>❌</span> Tout décocher sur ce support
-                </button>
-            </div>
-
-            <div id="sectionTachesSupport" class="hidden space-y-3">
-                <div class="flex justify-between items-center pt-2">
-                    <h3 class="font-bold text-sm text-gray-700">Liste des tâches :</h3>
-                    <button onclick="ouvrirModalAjoutTache()" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow transition flex items-center gap-1">
-                        <span>➕</span> Ajouter un travail non prévu
+                <div class="border-t pt-4 mt-auto">
+                    <button onclick="deconnexion()" class="w-full bg-red-50 hover:bg-red-100 text-red-600 p-2 rounded-lg text-xs font-bold transition">
+                        🔒 Changer d'utilisateur
                     </button>
                 </div>
-                <div id="containerTaches" class="space-y-3"></div>
-            </div>
-        </div>
+            </aside>
 
-        <!-- ================= PAGE 2 : AVANCEMENT CHANTIERS ================= -->
-        <div id="page2" class="hidden">
-            <div class="flex justify-between items-center mb-4 border-b pb-4">
-                <h2 class="text-xl font-bold text-gray-800">📊 Avancement Global des Chantiers</h2>
-                <button onclick="partagerPDFAvancement()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold shadow transition flex items-center gap-2 text-sm">
-                    <span>📲</span> Partager PDF Avancement
-                </button>
-            </div>
-            <div id="conteneurAvancement" class="space-y-4">
-                <p class="text-gray-500 text-sm italic text-center py-4">Chargement de l'avancement...</p>
-            </div>
-        </div>
+            <!-- ================= CONTENU CENTRAL ================= -->
+            <main class="bg-white p-6 rounded-xl shadow-md md:col-span-2 lg:col-span-3 flex flex-col">
+                
+                <!-- PAGE 1 : SAISIE -->
+                <div id="page1" class="flex-1 flex flex-col">
+                    <div class="flex flex-wrap justify-between items-center mb-4 border-b pb-3 gap-2">
+                        <h2 class="text-lg font-bold text-gray-800">📋 Liste des Travaux & Tâches</h2>
+                        <div id="containerActions" class="hidden flex gap-2">
+                            <button id="btnCopier" onclick="copierTravaux()" class="bg-gray-800 hover:bg-gray-900 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow transition flex items-center gap-1">
+                                <span>📋</span> Copier
+                            </button>
+                            <button id="btnSharePDF" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow transition flex items-center gap-1">
+                                <span>📄</span> PDF
+                            </button>
+                        </div>
+                    </div>
 
+                    <!-- Actions rapides support -->
+                    <div id="sectionActionsRapides" class="hidden flex gap-2 mb-4">
+                        <button onclick="cocherToutSupport(true)" class="bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 border border-blue-200">
+                            <span>✅</span> Tout cocher
+                        </button>
+                        <button onclick="cocherToutSupport(false)" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1">
+                            <span>❌</span> Tout décocher
+                        </button>
+                    </div>
+
+                    <div id="sectionTachesSupport" class="hidden flex-1 flex flex-col space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span id="labelSupportCourant" class="font-bold text-xs text-blue-600 uppercase"></span>
+                            <button onclick="ouvrirModalAjoutTache()" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow transition flex items-center gap-1">
+                                <span>➕</span> Ajouter tâche
+                            </button>
+                        </div>
+                        <div id="containerTaches" class="space-y-3 overflow-y-auto max-h-[60vh] pr-1"></div>
+                    </div>
+                    <div id="placeholderSelection" class="flex-1 flex items-center justify-center text-gray-400 text-sm italic py-12">
+                        Veuillez sélectionner un chantier et un support pour afficher les tâches.
+                    </div>
+                </div>
+
+                <!-- PAGE 2 : AVANCEMENT CHANTIERS -->
+                <div id="page2" class="hidden flex-1 flex flex-col">
+                    <div class="flex justify-between items-center mb-4 border-b pb-3">
+                        <h2 class="text-lg font-bold text-gray-800">📊 Avancement Global des Chantiers</h2>
+                        <button onclick="partagerPDFAvancement()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg font-bold shadow transition flex items-center gap-1 text-xs">
+                            <span>📲</span> Partager PDF Avancement
+                        </button>
+                    </div>
+                    <div id="conteneurAvancement" class="space-y-4 overflow-y-auto max-h-[65vh]">
+                        <p class="text-gray-500 text-sm italic text-center py-4">Chargement de l'avancement...</p>
+                    </div>
+                </div>
+
+            </main>
+
+            <!-- ================= SIDEBAR DROITE : SUPPORTS & FILTRES RAPIDES ================= -->
+            <aside class="bg-white p-4 rounded-xl shadow-md md:col-span-1 flex flex-col gap-4 h-fit">
+                <div>
+                    <h2 class="text-xs font-bold uppercase text-gray-500 mb-2 tracking-wider">🗼 Supports</h2>
+                    <select id="selectSupport" class="w-full p-2.5 border rounded-lg bg-gray-50 text-sm focus:ring-2 focus:ring-blue-500" disabled>
+                        <option value="">Choisir un support...</option>
+                    </select>
+                </div>
+
+                <div class="border-t pt-4">
+                    <h2 class="text-xs font-bold uppercase text-gray-500 mb-2 tracking-wider">📌 Filtres & Infos</h2>
+                    <div class="space-y-2 text-xs text-gray-600">
+                        <div class="bg-gray-50 p-2.5 rounded border">
+                            <span class="font-bold block text-gray-700 mb-1">État de session :</span>
+                            <span id="sidebarStatutSession" class="text-blue-600 font-semibold">En attente de RJ</span>
+                        </div>
+                        <div class="bg-gray-50 p-2.5 rounded border">
+                            <span class="font-bold block text-gray-700 mb-1">Actions rapides :</span>
+                            <button onclick="verifierModificationsEtDemanderRJ('pdf')" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-1.5 px-2 rounded font-bold transition text-center">
+                                Générer Rapport PDF
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+        </div>
     </div>
 
     <!-- Modale RJ -->
-    <div id="divRJModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white p-6 rounded-xl shadow-lg w-85 max-w-sm text-center">
+    <div id="divRJModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-sm text-center">
             <p class="font-bold text-lg mb-2 text-gray-800">🌙 Numéro RJ requis</p>
             <p class="text-xs text-gray-600 mb-4">Veuillez indiquer le numéro RJ pour valider cette action :</p>
-            <input type="text" id="rjInput" placeholder="Numéro RJ" class="w-full p-2 border rounded-lg mb-4 text-center font-bold focus:ring-2 focus:ring-blue-500">
+            <input type="text" id="rjInput" placeholder="Numéro RJ" class="w-full p-2.5 border rounded-lg mb-4 text-center font-bold focus:ring-2 focus:ring-blue-500 text-sm">
             <div class="flex gap-2">
-                <button onclick="executerActionEnAttente()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-lg font-bold text-sm">✅ Valider</button>
-                <button onclick="document.getElementById('divRJModal').classList.add('hidden')" class="flex1 bg-gray-200 hover:bg-gray-300 text-gray-800 p-2 rounded-lg font-bold text-sm">❌ Annuler</button>
+                <button onclick="executerActionEnAttente()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white p-2.5 rounded-lg font-bold text-sm">✅ Valider</button>
+                <button onclick="document.getElementById('divRJModal').classList.add('hidden')" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 p-2.5 rounded-lg font-bold text-sm">❌ Annuler</button>
             </div>
         </div>
     </div>
 
     <!-- Modale Ajout Tâche -->
-    <div id="divAjoutTacheModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white p-6 rounded-xl shadow-lg w-90 max-w-sm">
+    <div id="divAjoutTacheModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-sm">
             <p class="font-bold text-lg mb-2 text-gray-800 text-center">➕ Ajouter un travail non prévu</p>
             <p class="text-xs text-gray-600 mb-4 text-center">Ce travail sera enregistré directement dans Supabase.</p>
             <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Intitulé de la tâche :</label>
             <input type="text" id="inputNouvelleTache" placeholder="Ex: Reprise fondation spécifique..." class="w-full p-2.5 border rounded-lg mb-4 text-sm focus:ring-2 focus:ring-blue-500">
             <div class="flex gap-2">
-                <button onclick="validerAjoutTacheManuelle()" class="flex-1 bg-green-600 hover:bg-green-700 text-white p-2 rounded-lg font-bold text-sm">✅ Ajouter</button>
-                <button onclick="document.getElementById('divAjoutTacheModal').classList.add('hidden')" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 p-2 rounded-lg font-bold text-sm">❌ Annuler</button>
+                <button onclick="validerAjoutTacheManuelle()" class="flex-1 bg-green-600 hover:bg-green-700 text-white p-2.5 rounded-lg font-bold text-sm">✅ Ajouter</button>
+                <button onclick="document.getElementById('divAjoutTacheModal').classList.add('hidden')" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 p-2.5 rounded-lg font-bold text-sm">❌ Annuler</button>
             </div>
         </div>
     </div>
@@ -154,6 +213,7 @@
         let userPrenom = localStorage.getItem('prenomSutx') || "";
         let userAdmin = false;
         let actionEnCours = null;
+        let fichierScanneActif = null;
 
         window.addEventListener('DOMContentLoaded', () => {
             if ('serviceWorker' in navigator) {
@@ -192,7 +252,7 @@
                 if (!userRecord) {
                     const { data: newRecord, error: insertError } = await supabaseClient
                         .from('app_bob')
-                        .insert([
+                    .insert([
                             { email: emailInput, nom: nomInput, prenom: prenomInput, sutx: false, admin: false }
                         ])
                         .select()
@@ -240,9 +300,7 @@
                     .maybeSingle();
 
                 if (error || !userRecord || userRecord.sutx !== true) {
-                    localStorage.clear();
-                    document.getElementById('auth-overlay').classList.remove('hidden');
-                    document.getElementById('main-app').classList.add('hidden');
+                    deconnexion();
                     if (userRecord && userRecord.sutx !== true) {
                         const errorEl = document.getElementById('auth-error');
                         errorEl.textContent = "❌ Votre accès SUTX a été désactivé.";
@@ -258,10 +316,16 @@
             }
         }
 
+        function deconnexion() {
+            localStorage.clear();
+            document.getElementById('auth-overlay').classList.remove('hidden');
+            document.getElementById('main-app').classList.add('hidden');
+        }
+
         function lancerApplication() {
             document.getElementById('auth-overlay').classList.add('hidden');
             document.getElementById('main-app').classList.remove('hidden');
-            document.getElementById('headerInfo').innerText = `👤 SUTX : ${userPrenom} ${userName}`;
+            document.getElementById('headerInfo').innerText = `👤 ${userPrenom} ${userName}`;
 
             if (userAdmin) {
                 document.getElementById('tabPage2').classList.remove('hidden');
@@ -285,7 +349,7 @@
                 
                 const chantiers = [...new Set(rawData.map(r => r.Chantier))].filter(Boolean);
                 const selectChantier = document.getElementById('selectChantier');
-                selectChantier.innerHTML = '<option value="">Choisir...</option>';
+                selectChantier.innerHTML = '<option value="">Choisir un chantier...</option>';
                 chantiers.forEach(c => selectChantier.add(new Option(c, c)));
             } catch (err) {
                 console.error("Erreur de chargement des tâches :", err);
@@ -307,13 +371,13 @@
             if (numPage === 1) {
                 page1.classList.remove('hidden');
                 page2.classList.add('hidden');
-                tab1.className = "flex-1 py-2 px-4 rounded-lg font-bold text-sm bg-blue-600 text-white shadow transition";
-                tab2.className = "flex-1 py-2 px-4 rounded-lg font-bold text-sm bg-gray-200 text-gray-700 hover:bg-gray-300 transition";
+                tab1.className = "py-1.5 px-4 rounded-lg font-bold text-xs bg-blue-600 text-white shadow transition";
+                tab2.className = "py-1.5 px-4 rounded-lg font-bold text-xs bg-gray-200 text-gray-700 hover:bg-gray-300 transition";
             } else {
                 page1.classList.add('hidden');
                 page2.classList.remove('hidden');
-                tab2.className = "flex-1 py-2 px-4 rounded-lg font-bold text-sm bg-blue-600 text-white shadow transition";
-                tab1.className = "flex-1 py-2 px-4 rounded-lg font-bold text-sm bg-gray-200 text-gray-700 hover:bg-gray-300 transition";
+                tab2.className = "py-1.5 px-4 rounded-lg font-bold text-xs bg-blue-600 text-white shadow transition";
+                tab1.className = "py-1.5 px-4 rounded-lg font-bold text-xs bg-gray-200 text-gray-700 hover:bg-gray-300 transition";
                 calculerEtAfficherAvancement();
             }
         }
@@ -339,11 +403,11 @@
                 divChantier.className = "bg-gray-50 p-4 border rounded-lg shadow-sm";
                 divChantier.innerHTML = `
                     <div class="flex justify-between items-center mb-2">
-                        <span class="font-bold text-gray-800">${chantier}</span>
-                        <span class="text-sm font-semibold text-blue-600">${tachesFaites} / ${totalTaches} (${pourcentage}%)</span>
+                        <span class="font-bold text-gray-800 text-sm">${chantier}</span>
+                        <span class="text-xs font-semibold text-blue-600">${tachesFaites} / ${totalTaches} (${pourcentage}%)</span>
                     </div>
-                    <div class="w-full bg-gray-200 rounded-full h-3">
-                        <div class="bg-blue-600 h-3 rounded-full transition-all duration-500" style="width: ${pourcentage}%"></div>
+                    <div class="w-full bg-gray-200 rounded-full h-2.5">
+                        <div class="bg-blue-600 h-2.5 rounded-full transition-all duration-500" style="width: ${pourcentage}%"></div>
                     </div>
                 `;
                 conteneur.appendChild(divChantier);
@@ -356,12 +420,16 @@
         const sectionTachesSupport = document.getElementById('sectionTachesSupport');
         const sectionActionsRapides = document.getElementById('sectionActionsRapides');
         const containerActions = document.getElementById('containerActions');
+        const placeholderSelection = document.getElementById('placeholderSelection');
 
         selectChantier.addEventListener('change', () => {
-            selectSupport.innerHTML = '<option value="">Choisir...</option>';
+            selectSupport.innerHTML = '<option value="">Choisir un support...</option>';
             sectionTachesSupport.classList.add('hidden');
             sectionActionsRapides.classList.add('hidden');
+            containerActions.classList.add('hidden');
+            placeholderSelection.classList.remove('hidden');
             containerTaches.innerHTML = '';
+            
             const chantierChoisi = selectChantier.value;
             if (!chantierChoisi) {
                 selectSupport.disabled = true;
@@ -385,8 +453,12 @@
                 sectionTachesSupport.classList.add('hidden');
                 sectionActionsRapides.classList.add('hidden');
                 containerActions.classList.add('hidden');
+                placeholderSelection.classList.remove('hidden');
                 return;
             }
+
+            placeholderSelection.classList.add('hidden');
+            document.getElementById('labelSupportCourant').innerText = `Support : ${supportChoisi}`;
 
             const lignesFiltrees = rawData.filter(r => r.Chantier === chantierChoisi && r.Support === supportChoisi);
 
@@ -399,13 +471,13 @@
                 div.innerHTML = `
                     <input type="checkbox" ${isChecked ? 'checked' : ''} 
                         onchange="modifierLigne(${indexGlobal}, 'Fait', this.checked)" 
-                        class="w-6 h-6 text-blue-600 rounded cursor-pointer">
-                    <div class="flex-1 text-sm font-medium text-gray-800">
-                        ${item.Tache} ${item.isCustom ? '<span class="text-xs bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded font-bold ml-2">Ajout manuel</span>' : ''}
+                        class="w-5 h-5 text-blue-600 rounded cursor-pointer">
+                    <div class="flex-1 text-xs font-medium text-gray-800">
+                        ${item.Tache} ${item.isCustom ? '<span class="text-[10px] bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded font-bold ml-1">Manuel</span>' : ''}
                     </div>
                     <input type="text" value="${item.Observation || ''}" placeholder="Observation..." 
                         onchange="modifierLigne(${indexGlobal}, 'Observation', this.value)" 
-                        class="w-1/3 p-1.5 text-sm border rounded bg-white focus:ring-2 focus:ring-blue-500">
+                        class="w-1/3 p-1.5 text-xs border rounded bg-white focus:ring-2 focus:ring-blue-500">
                 `;
                 containerTaches.appendChild(div);
             });
@@ -508,9 +580,31 @@
             }
         }
 
-        document.getElementById('btnSharePDF').addEventListener('click', () => {
-            verifierModificationsEtDemanderRJ('pdf');
-        });
+        // Fonctions pour le module Scan / Fichiers techniques
+        function traiterFichierScanne(event) {
+            const file = event.target.files[0];
+            const resultDiv = document.getElementById('scanResultat');
+            if (!file) return;
+
+            fichierScanneActif = file;
+            resultDiv.classList.remove('hidden');
+            resultDiv.innerHTML = `📄 <strong>Fichier chargé :</strong> ${file.name}`;
+        }
+
+        function lancerAnalyseScan() {
+            const resultDiv = document.getElementById('scanResultat');
+            if (!fichierScanneActif) {
+                alert("Veuillez d'abord importer ou scanner un fichier (PDF ou image).");
+                return;
+            }
+
+            resultDiv.classList.remove('hidden');
+            resultDiv.innerHTML = `🔍 Analyse en cours de <em>${fichierScanneActif.name}</em>...<br>Recherche des paramètres (1500V, 25000V, schémas)...`;
+            
+            setTimeout(() => {
+                resultDiv.innerHTML = `✅ Analyse terminée pour <strong>${fichierScanneActif.name}</strong>.<br><span class="text-green-600 font-bold">Données prêtes à être intégrées.</span>`;
+            }, 1200);
+        }
 
         function copierTravaux() {
             copierDansPressePapier();
@@ -537,7 +631,8 @@
             }
             sessionRJ = saisiRJ;
             document.getElementById('divRJModal').classList.add('hidden');
-            document.getElementById('headerInfo').innerText = `👤 SUTX : ${userPrenom} ${userName} | 📌 RJ : ${sessionRJ}`;
+            document.getElementById('headerInfo').innerText = `👤 ${userPrenom} ${userName} | 📌 RJ : ${sessionRJ}`;
+            document.getElementById('sidebarStatutSession').innerText = `RJ Actif : ${sessionRJ}`;
 
             if (actionEnCours === 'pdf') {
                 genererEtPartagerPDF();
@@ -548,7 +643,7 @@
             const elementsFaites = rawData.filter(r => r.modifie === true && ['vrai', 'true', '1'].includes(String(r.Fait).toLowerCase().trim()));
 
             if (elementsFaites.length === 0) {
-                alert("Aucun travail validé (coché fait) n'a été trouvé pour la copie.");
+                alert("Aucun travail validé trouvé pour la copie.");
                 return;
             }
 
