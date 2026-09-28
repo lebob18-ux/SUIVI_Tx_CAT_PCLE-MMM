@@ -17,8 +17,79 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     <!-- SDK Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        /* Fond assombri derrière les sidebars */
+        .sidebar-backdrop { display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+            background-color:rgba(0,0,0,0.4); z-index:999; }
+        .sidebar-backdrop.active { display:block; }
+
+        /* Sidebar GAUCHE (menu / chantiers) */
+        .sidebar { height:100%; width:0; position:fixed; z-index:1000; top:0; left:0; background-color:#111;
+            overflow-x:hidden; overflow-y:auto; transition:0.3s; padding-top:60px; padding-bottom:120px;
+            box-shadow:2px 0 5px rgba(0,0,0,0.5); }
+        .sidebar button.sidebar-action-btn { padding:12px 20px; font-size:18px; color:#818181; display:block;
+            background:none; border:none; width:100%; text-align:left; cursor:pointer; transition:0.2s; }
+        .sidebar button.sidebar-action-btn:hover { color:#f1f1f1; background-color:#222; }
+        .sidebar .btn-fermer { position:absolute; top:15px; right:20px; font-size:30px; width:auto;
+            color:#818181; background:none; border:none; cursor:pointer; }
+
+        /* Sidebar DROITE (supports) */
+        .sidebar-right { height:100%; width:0; position:fixed; z-index:1000; top:0; right:0; background-color:#111;
+            overflow-x:hidden; overflow-y:auto; transition:0.3s; padding-top:60px; padding-bottom:120px;
+            box-shadow:-2px 0 5px rgba(0,0,0,0.5); }
+        .sidebar-right .btn-fermer-droit { position:absolute; top:15px; left:20px; font-size:30px; width:auto;
+            color:#818181; background:none; border:none; cursor:pointer; }
+
+        /* Boutons fixes en bas des sidebars */
+        .sidebar-fixed-footer { position:fixed; bottom:0; width:0; overflow:hidden; background-color:#1a1a1a;
+            box-sizing:border-box; border-top:1px solid #333; transition:width 0.3s; z-index:1001; }
+        #footerGauche { left:0; }
+        #footerDroit { right:0; }
+        .sidebar-fixed-footer button { display:block; width:100%; background-color:#2563eb; color:#fff; border:none;
+            padding:12px 15px; font-size:16px; font-weight:bold; cursor:pointer; transition:background-color 0.2s;
+            white-space:nowrap; }
+        .sidebar-fixed-footer button + button { border-top:1px solid #1d4ed8; }
+        .sidebar-fixed-footer button:hover { background-color:#1d4ed8; }
+    </style>
 </head>
-<body class="bg-gray-100 p-2 sm:p-4 min-h-screen flex flex-col justify-between">
+<body class="bg-gray-100 p-4 min-h-screen">
+
+    <!-- FOND ASSOMBRI CLIQUABLE POUR FERMER LES MENUS -->
+    <div id="sidebarBackdrop" class="sidebar-backdrop" onclick="fermerToutesSidebars()"></div>
+
+    <!-- MENU LATÉRAL GAUCHE (CHANTIERS / ACTIONS) -->
+    <div id="menuParametres" class="sidebar">
+        <button class="btn-fermer" onclick="basculerMenuParametres()">&times;</button>
+
+        <button id="btnSidebarAdmin" class="sidebar-action-btn" style="display:none;" onclick="ouvrirOngletAdminDepuisMenu()">📊 Avancement (Admin)</button>
+        <button class="sidebar-action-btn" onclick="ouvrirFBMDepuisMenu()">🚧 Ouvrir FBM</button>
+
+        <div style="padding: 15px 20px;">
+            <label style="color: #aaa; font-size: 14px; display: block; margin-bottom: 8px; font-weight: bold;">🏗️ Choisir un chantier :</label>
+            <div id="sidebarChantiersContainer" style="display: flex; flex-direction: column; gap: 6px;"></div>
+        </div>
+
+        <div id="footerGauche" class="sidebar-fixed-footer">
+            <button onclick="actionCopierDepuisMenu()">📋 Copier</button>
+            <button onclick="actionPartagerPDFDepuisMenu()">📄 Partager PDF</button>
+        </div>
+    </div>
+
+    <!-- MENU LATÉRAL DROIT (LISTE DES SUPPORTS) -->
+    <div id="menuSupportsDroit" class="sidebar-right">
+        <button class="btn-fermer-droit" onclick="basculerMenuSupportsDroit()">&times;</button>
+        <div style="padding: 15px 20px;">
+            <h3 style="color: #fff; margin-top: 0; font-size: 1.1em; border-bottom: 1px solid #333; padding-bottom: 8px;">📍 Liste des Supports</h3>
+            <div style="margin-bottom: 12px;">
+                <input type="text" id="filtreSupportInput" placeholder="Rechercher un support..." oninput="filtrerListeSupportsDroite()" style="width: 100%; padding: 8px; box-sizing: border-box; border-radius: 4px; border: 1px solid #444; background: #222; color: #fff;">
+            </div>
+            <div id="sidebarSupportsContainer" style="display: flex; flex-direction: column; gap: 6px;"></div>
+        </div>
+
+        <div id="footerDroit" class="sidebar-fixed-footer">
+            <button onclick="actionPartagerPDFDepuisMenu()">📄 Partager PDF</button>
+        </div>
+    </div>
 
     <!-- ÉCRAN D'IDENTIFICATION (Nom, Prénom, Email) -->
     <div id="auth-overlay" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
@@ -33,143 +104,116 @@
         </div>
     </div>
 
-    <!-- CONTENEUR GLOBAL AVEC SIDEBARS GAUCHE ET DROITE -->
-    <div id="main-app" class="w-full max-w-7xl mx-auto flex-1 flex flex-col xl:flex-row gap-4 items-start hidden">
+    <!-- CONTENU PRINCIPAL -->
+    <div id="main-app" class="max-w-4xl mx-auto bg-white rounded-xl shadow-md p-6 hidden">
         
-        <!-- ================= SIDEBAR GAUCHE : LISTE DES CHANTIERS ================= -->
-        <aside class="w-full xl:w-72 bg-white rounded-xl shadow-md p-4 xl:sticky xl:top-4 flex flex-col max-h-[500px] xl:max-h-[calc(100vh-2rem)]">
-            <div class="flex items-center justify-between mb-3 border-b pb-2">
-                <h3 class="font-bold text-sm text-gray-800 flex items-center gap-1.5">
-                    <span>🏗️</span> Chantiers
-                </h3>
-                <span id="badgeCountChantiers" class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold">0</span>
-            </div>
-            <!-- Filtre de recherche chantiers -->
-            <div class="mb-3">
-                <input type="text" id="filtreChantiers" placeholder="Rechercher chantier..." oninput="filtrerListesSidebars()" class="w-full p-2 border rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-gray-50">
-            </div>
-            <!-- Liste dynamique des chantiers -->
-            <div id="listeChantiersSidebar" class="overflow-y-auto space-y-1.5 flex-1 pr-1">
-                <p class="text-xs text-gray-400 italic text-center py-4">Chargement...</p>
-            </div>
-        </aside>
+        <!-- Barre des onglets de navigation -->
+        <div class="flex gap-2 mb-6 border-b pb-4">
+            <button type="button" onclick="basculerMenuParametres()" title="Ouvrir le menu" class="px-3 py-2 rounded-lg font-bold text-lg bg-gray-800 hover:bg-gray-900 text-white shadow transition">☰</button>
+            <button id="tabPage1" onclick="changerOnglet(1)" class="flex-1 py-2 px-4 rounded-lg font-bold text-sm bg-blue-600 text-white shadow transition">
+                📋 Saisie & Suivi
+            </button>
+            <button id="tabPage2" onclick="changerOnglet(2)" class="flex-1 py-2 px-4 rounded-lg font-bold text-sm bg-gray-200 text-gray-700 hover:bg-gray-300 transition hidden">
+                📊 Avancement Chantiers
+            </button>
+        </div>
 
-        <!-- ================= CONTENU PRINCIPAL CENTRAL ================= -->
-        <main class="flex-1 w-full bg-white rounded-xl shadow-md p-4 sm:p-6">
+        <!-- ================= PAGE 1 : SAISIE ================= -->
+        <div id="page1">
+            <div class="flex flex-wrap justify-between items-center mb-2 border-b pb-4 gap-2">
+                <h1 class="text-xl font-bold text-gray-800">📋 Suivi des Travaux</h1>
+                <div id="containerActions" class="hidden flex gap-2">
+                    <button id="btnCopier" onclick="copierTravaux()" class="bg-gray-800 hover:bg-gray-900 text-white px-3 py-2 rounded-lg font-bold text-sm shadow transition flex items-center gap-1.5">
+                        <span>📋</span> Copier
+                    </button>
+                    <button id="btnSharePDF" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg font-bold text-sm shadow transition flex items-center gap-1.5">
+                        <span>📄</span> Partager PDF
+                    </button>
+                </div>
+            </div>
             
-            <!-- Barre des onglets de navigation -->
-            <div class="flex gap-2 mb-6 border-b pb-4">
-                <button id="tabPage1" onclick="changerOnglet(1)" class="flex-1 py-2 px-4 rounded-lg font-bold text-sm bg-blue-600 text-white shadow transition">
-                    📋 Saisie & Suivi
+            <div id="headerInfo" class="text-sm text-blue-700 mb-6 font-semibold bg-blue-50 p-2.5 rounded-lg border border-blue-100"></div>
+            
+            <div class="grid grid-cols-2 gap-3 mb-4">
+                <button type="button" onclick="basculerMenuParametres()" class="p-2.5 border rounded-lg bg-blue-50 border-blue-200 text-left hover:bg-blue-100 transition">
+                    <span class="block text-xs font-bold uppercase text-gray-600 mb-0.5">🏗️ Chantier</span>
+                    <span id="labelChantierActif" class="block text-sm font-bold text-blue-700 truncate">Aucun chantier</span>
                 </button>
-                <button id="tabPage2" onclick="changerOnglet(2)" class="flex-1 py-2 px-4 rounded-lg font-bold text-sm bg-gray-200 text-gray-700 hover:bg-gray-300 transition hidden">
-                    📊 Avancement Chantiers
+                <button type="button" onclick="basculerMenuSupportsDroit()" class="p-2.5 border rounded-lg bg-blue-50 border-blue-200 text-left hover:bg-blue-100 transition">
+                    <span class="block text-xs font-bold uppercase text-gray-600 mb-0.5">📍 Support ▾</span>
+                    <span id="labelSupportActif" class="block text-sm font-bold text-blue-700 truncate">-- Choisir support --</span>
                 </button>
             </div>
 
-            <!-- ================= PAGE 1 : SAISIE ================= -->
-            <div id="page1">
-                <div class="flex flex-wrap justify-between items-center mb-2 border-b pb-4 gap-2">
-                    <h1 class="text-xl font-bold text-gray-800">📋 Suivi des Travaux</h1>
-                    <div id="containerActions" class="hidden flex gap-2">
-                        <button id="btnCopier" onclick="copierTravaux()" class="bg-gray-800 hover:bg-gray-900 text-white px-3 py-2 rounded-lg font-bold text-sm shadow transition flex items-center gap-1.5">
-                            <span>📋</span> Copier
-                        </button>
-                        <button id="btnSharePDF" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg font-bold text-sm shadow transition flex items-center gap-1.5">
-                            <span>📄</span> Partager PDF
-                        </button>
-                    </div>
-                </div>
-                
-                <div id="headerInfo" class="text-sm text-blue-700 mb-6 font-semibold bg-blue-50 p-2.5 rounded-lg border border-blue-100"></div>
-                
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                    <div>
-                        <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Chantier :</label>
-                        <select id="selectChantier" class="w-full p-2.5 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500">
-                            <option value="">Choisir...</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Support :</label>
-                        <select id="selectSupport" class="w-full p-2.5 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500" disabled>
-                            <option value="">Choisir...</option>
-                        </select>
-                    </div>
-                </div>
+            <!-- Listes natives gardées cachées : elles portent les valeurs, les sidebars les pilotent -->
+            <div style="display:none;">
+                <select id="selectChantier">
+                    <option value="">Choisir...</option>
+                </select>
+                <select id="selectSupport" disabled>
+                    <option value="">Choisir...</option>
+                </select>
+            </div>
 
-                <!-- Boutons globaux pour cocher / décocher rapidement toutes les tâches du support -->
-                <div id="sectionActionsRapides" class="hidden flex flex-wrap gap-2 mb-4">
-                    <button onclick="cocherToutSupport(true)" class="bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1">
-                        <span>✅</span> Tout cocher sur ce support
-                    </button>
-                    <button onclick="cocherToutSupport(false)" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1">
-                        <span>❌</span> Tout décocher sur ce support
+            <!-- Lien vers l'app FBM (visible quand un support est choisi) -->
+            <div id="sectionLienFBM" class="hidden mb-4">
+                <button onclick="ouvrirFBM()" class="w-full bg-orange-500 hover:bg-orange-600 text-white px-3 py-2.5 rounded-lg text-sm font-bold shadow transition flex items-center justify-center gap-2">
+                    <span>🚧</span> Ouvrir la fiche FBM (fouille / blindage)
+                </button>
+            </div>
+
+            <!-- Boutons globaux pour cocher / décocher rapidement toutes les tâches du support -->
+            <div id="sectionActionsRapides" class="hidden flex gap-2 mb-4">
+                <button onclick="cocherToutSupport(true)" class="bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1">
+                    <span>✅</span> Tout cocher sur ce support
+                </button>
+                <button onclick="cocherToutSupport(false)" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1">
+                    <span>❌</span> Tout décocher sur ce support
+                </button>
+            </div>
+
+            <div id="sectionTachesSupport" class="hidden space-y-3">
+                <div class="flex justify-between items-center pt-2">
+                    <h3 class="font-bold text-sm text-gray-700">Liste des tâches :</h3>
+                    <button onclick="ouvrirModalAjoutTache()" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow transition flex items-center gap-1">
+                        <span>➕</span> Ajouter un travail non prévu
                     </button>
                 </div>
+                <div id="containerTaches" class="space-y-3"></div>
+            </div>
+        </div>
 
-                <div id="sectionTachesSupport" class="hidden space-y-3">
-                    <div class="flex justify-between items-center pt-2">
-                        <h3 class="font-bold text-sm text-gray-700">Liste des tâches :</h3>
-                        <button onclick="ouvrirModalAjoutTache()" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow transition flex items-center gap-1">
-                            <span>➕</span> Ajouter un travail non prévu
-                        </button>
-                    </div>
-                    <div id="containerTaches" class="space-y-3"></div>
-                </div>
+        <!-- ================= PAGE 2 : AVANCEMENT CHANTIERS ================= -->
+        <div id="page2" class="hidden">
+            <div class="flex justify-between items-center mb-4 border-b pb-4">
+                <h2 class="text-xl font-bold text-gray-800">📊 Avancement Global des Chantiers</h2>
+                <button onclick="partagerPDFAvancement()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold shadow transition flex items-center gap-2 text-sm">
+                    <span>📲</span> Partager PDF Avancement
+                </button>
             </div>
-
-            <!-- ================= PAGE 2 : AVANCEMENT CHANTIERS ================= -->
-            <div id="page2" class="hidden">
-                <div class="flex justify-between items-center mb-4 border-b pb-4">
-                    <h2 class="text-xl font-bold text-gray-800">📊 Avancement Global des Chantiers</h2>
-                    <button onclick="partagerPDFAvancement()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold shadow transition flex items-center gap-2 text-sm">
-                        <span>📲</span> Partager PDF Avancement
-                    </button>
-                </div>
-                <div id="conteneurAvancement" class="space-y-4">
-                    <p class="text-gray-500 text-sm italic text-center py-4">Chargement de l'avancement...</p>
-                </div>
+            <div id="conteneurAvancement" class="space-y-4">
+                <p class="text-gray-500 text-sm italic text-center py-4">Chargement de l'avancement...</p>
             </div>
-
-        </main>
-
-        <!-- ================= SIDEBAR DROITE : LISTE DES SUPPORTS ================= -->
-        <aside class="w-full xl:w-72 bg-white rounded-xl shadow-md p-4 xl:sticky xl:top-4 flex flex-col max-h-[500px] xl:max-h-[calc(100vh-2rem)]">
-            <div class="flex items-center justify-between mb-3 border-b pb-2">
-                <h3 class="font-bold text-sm text-gray-800 flex items-center gap-1.5">
-                    <span>📌</span> Supports
-                </h3>
-                <span id="badgeCountSupports" class="text-xs bg-gray-100 text-gray-800 px-2 py-0.5 rounded-full font-bold">0</span>
-            </div>
-            <!-- Filtre de recherche supports -->
-            <div class="mb-3">
-                <input type="text" id="filtreSupports" placeholder="Rechercher support..." oninput="filtrerListesSidebars()" class="w-full p-2 border rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-gray-50">
-            </div>
-            <!-- Liste dynamique des supports -->
-            <div id="listeSupportsSidebar" class="overflow-y-auto space-y-1.5 flex-1 pr-1">
-                <p class="text-xs text-gray-400 italic text-center py-4">Sélectionnez un chantier</p>
-            </div>
-        </aside>
+        </div>
 
     </div>
 
     <!-- Modale RJ -->
-    <div id="divRJModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-sm text-center">
+    <div id="divRJModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-xl shadow-lg w-85 max-w-sm text-center">
             <p class="font-bold text-lg mb-2 text-gray-800">🌙 Numéro RJ requis</p>
             <p class="text-xs text-gray-600 mb-4">Veuillez indiquer le numéro RJ pour valider cette action :</p>
             <input type="text" id="rjInput" placeholder="Numéro RJ" class="w-full p-2 border rounded-lg mb-4 text-center font-bold focus:ring-2 focus:ring-blue-500">
             <div class="flex gap-2">
                 <button onclick="executerActionEnAttente()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-lg font-bold text-sm">✅ Valider</button>
-                <button onclick="document.getElementById('divRJModal').classList.add('hidden')" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 p-2 rounded-lg font-bold text-sm">❌ Annuler</button>
+                <button onclick="document.getElementById('divRJModal').classList.add('hidden')" class="flex1 bg-gray-200 hover:bg-gray-300 text-gray-800 p-2 rounded-lg font-bold text-sm">❌ Annuler</button>
             </div>
         </div>
     </div>
 
     <!-- Modale Ajout Tâche -->
-    <div id="divAjoutTacheModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-sm">
+    <div id="divAjoutTacheModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-xl shadow-lg w-90 max-w-sm">
             <p class="font-bold text-lg mb-2 text-gray-800 text-center">➕ Ajouter un travail non prévu</p>
             <p class="text-xs text-gray-600 mb-4 text-center">Ce travail sera enregistré directement dans Supabase.</p>
             <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Intitulé de la tâche :</label>
@@ -183,8 +227,8 @@
 
     <script>
         /* ================= CONFIGURATION SUPABASE ================= */
-        const SUPABASE_URL = "https://thbqkeugjvsxbryfnzuo.supabase.co";
-        const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
+const SUPABASE_URL = "https://thbqkeugjvsxbryfnzuo.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
 
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -196,15 +240,60 @@
         let userAdmin = false;
         let actionEnCours = null;
 
-        window.addEventListener('DOMContentLoaded', () => {
-            try {
-                if ('serviceWorker' in navigator) {
-                    navigator.serviceWorker.register('sw.js').catch(() => {
-                        // Ignorer silencieusement si sw.js n'est pas trouvé ou non supporté
-                    });
+        /* ================= LIEN QR / JUMELAGE FBM ================= */
+        // ⚠️ À ADAPTER : adresse exacte de l'app FBM (avec le / final)
+        const URL_FBM = "https://TON-COMPTE.github.io/DEPOT-FBM/";
+
+        // Paramètres lus dans le lien du QR (?chantier=...&support=...), gardés jusqu'à la fin du chargement
+        const paramsLien = new URLSearchParams(location.search);
+        let qrChantier = paramsLien.get('chantier') || "";
+        let qrSupport = paramsLien.get('support') || "";
+
+        function appliquerParamsQR() {
+            if (!qrChantier) return;
+            const norm = t => (t || '').toString().trim().toLowerCase();
+            const trouver = (sel, val) => Array.from(sel.options).find(o =>
+                o.value && (norm(o.value) === norm(val) || norm(o.text) === norm(val)));
+
+            const optC = trouver(selectChantier, qrChantier);
+            if (!optC) {
+                alert("Chantier « " + qrChantier + " » introuvable dans SUTX.");
+            } else {
+                selectChantier.value = optC.value;
+                selectChantier.dispatchEvent(new Event('change'));
+                if (qrSupport) {
+                    const optS = trouver(selectSupport, qrSupport);
+                    if (optS) {
+                        selectSupport.value = optS.value;
+                        selectSupport.dispatchEvent(new Event('change'));
+                    } else {
+                        alert("Support « " + qrSupport + " » introuvable pour ce chantier.");
+                    }
                 }
-            } catch (e) {
-                // Ignore SW errors in preview environments
+            }
+            qrChantier = "";
+            qrSupport = "";
+            history.replaceState(null, '', location.pathname);
+        }
+
+        function ouvrirFBM() {
+            const chantier = selectChantier.value;
+            const support = selectSupport.value;
+            if (!chantier || !support) {
+                alert("Choisis d'abord un chantier et un support.");
+                return;
+            }
+            if (URL_FBM.includes("TON-COMPTE")) {
+                alert("Adresse de FBM non configurée (constante URL_FBM).");
+                return;
+            }
+            location.href = URL_FBM + "?chantier=" + encodeURIComponent(chantier)
+                                    + "&support=" + encodeURIComponent(support);
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('sw.js').catch(console.error);
             }
 
             if (userEmail && userName) {
@@ -228,6 +317,7 @@
             }
 
             try {
+                // 1. Vérifier si l'utilisateur existe déjà dans app_bob
                 let { data: userRecord, error: searchError } = await supabaseClient
                     .from('app_bob')
                     .select('*')
@@ -236,6 +326,7 @@
 
                 if (searchError) throw searchError;
 
+                // 2. Si l'utilisateur n'existe pas, on le crée avec les accès à false par défaut
                 if (!userRecord) {
                     const { data: newRecord, error: insertError } = await supabaseClient
                         .from('app_bob')
@@ -248,12 +339,14 @@
                     if (insertError) throw insertError;
                     userRecord = newRecord;
                 } else {
+                    // Mettre à jour le nom/prénom si besoin
                     await supabaseClient
                         .from('app_bob')
                         .update({ nom: nomInput, prenom: prenomInput })
                         .eq('email', emailInput);
                 }
 
+                // 3. Vérification de l'autorisation SUTX
                 if (!userRecord || userRecord.sutx !== true) {
                     errorEl.textContent = "❌ Accès non autorisé. Veuillez contacter l'administrateur pour activer votre accès SUTX.";
                     errorEl.classList.remove('hidden');
@@ -287,7 +380,8 @@
                     .maybeSingle();
 
                 if (error || !userRecord || userRecord.sutx !== true) {
-                    localStorage.clear();
+                    // Accès révoqué ou utilisateur introuvable
+                    ['nomSutx', 'prenomSutx', 'emailSutx'].forEach(k => localStorage.removeItem(k));
                     document.getElementById('auth-overlay').classList.remove('hidden');
                     document.getElementById('main-app').classList.add('hidden');
                     if (userRecord && userRecord.sutx !== true) {
@@ -310,6 +404,8 @@
             document.getElementById('main-app').classList.remove('hidden');
             document.getElementById('headerInfo').innerText = `👤 SUTX : ${userPrenom} ${userName}`;
 
+            // Afficher l'onglet d'avancement uniquement si admin est true
+            document.getElementById('btnSidebarAdmin').style.display = userAdmin ? 'block' : 'none';
             if (userAdmin) {
                 document.getElementById('tabPage2').classList.remove('hidden');
             } else {
@@ -330,121 +426,17 @@
 
                 rawData = (data || []).map(r => ({ ...r, modifie: false, isCustom: false }));
                 
-                peuplerSelectChantiers();
-                mettreAJourSidebarChantiers();
+                const chantiers = [...new Set(rawData.map(r => r.Chantier))].filter(Boolean);
+                const selectChantier = document.getElementById('selectChantier');
+                selectChantier.innerHTML = '<option value="">Choisir...</option>';
+                chantiers.forEach(c => selectChantier.add(new Option(c, c)));
+
+                rafraichirSidebars();
+                appliquerParamsQR();
             } catch (err) {
                 console.error("Erreur de chargement des tâches :", err);
                 alert("Erreur lors du chargement des données de chantier.");
             }
-        }
-
-        function peuplerSelectChantiers() {
-            const chantiers = [...new Set(rawData.map(r => r.Chantier))].filter(Boolean);
-            const selectChantier = document.getElementById('selectChantier');
-            const valeurActuelle = selectChantier.value;
-            
-            selectChantier.innerHTML = '<option value="">Choisir...</option>';
-            chantiers.forEach(c => selectChantier.add(new Option(c, c)));
-            
-            if (chantiers.includes(valeurActuelle)) {
-                selectChantier.value = valeurActuelle;
-            }
-        }
-
-        function mettreAJourSidebarChantiers() {
-            const filtre = document.getElementById('filtreChantiers').value.toLowerCase();
-            const chantiers = [...new Set(rawData.map(r => r.Chantier))].filter(Boolean);
-            const chantiersFiltres = chantiers.filter(c => c.toLowerCase().includes(filtre));
-            
-            const conteneur = document.getElementById('listeChantiersSidebar');
-            document.getElementById('badgeCountChantiers').innerText = chantiers.length;
-            conteneur.innerHTML = '';
-
-            if (chantiersFiltres.length === 0) {
-                conteneur.innerHTML = '<p class="text-xs text-gray-400 italic text-center py-2">Aucun chantier</p>';
-                return;
-            }
-
-            const chantierSelectionne = document.getElementById('selectChantier').value;
-
-            chantiersFiltres.forEach(chantier => {
-                const isSelected = chantier === chantierSelectionne;
-                // Calcul du pourcentage d'avancement pour le badge du chantier
-                const lignes = rawData.filter(r => r.Chantier === chantier);
-                const total = lignes.length;
-                const faites = lignes.filter(r => ['vrai', 'true', '1'].includes(String(r.Fait).toLowerCase().trim())).length;
-                const pct = total > 0 ? Math.round((faites / total) * 100) : 0;
-
-                const btn = document.createElement('button');
-                btn.className = `w-full text-left p-2 rounded-lg text-xs font-medium transition flex items-center justify-between ${isSelected ? 'bg-blue-600 text-white font-bold shadow' : 'bg-gray-50 hover:bg-gray-100 text-gray-700'}`;
-                btn.innerHTML = `
-                    <span class="truncate pr-2">${chantier}</span>
-                    <span class="text-[10px] px-1.5 py-0.5 rounded ${isSelected ? 'bg-blue-700 text-white' : 'bg-gray-200 text-gray-600'}">${pct}%</span>
-                `;
-                btn.onclick = () => selectionnerChantierSidebar(chantier);
-                conteneur.appendChild(btn);
-            });
-        }
-
-        function selectionnerChantierSidebar(chantier) {
-            const selectChantier = document.getElementById('selectChantier');
-            selectChantier.value = chantier;
-            selectChantier.dispatchEvent(new Event('change'));
-            mettreAJourSidebarChantiers();
-        }
-
-        function mettreAJourSidebarSupports() {
-            const chantierChoisi = document.getElementById('selectChantier').value;
-            const filtre = document.getElementById('filtreSupports').value.toLowerCase();
-            const conteneur = document.getElementById('listeSupportsSidebar');
-            
-            if (!chantierChoisi) {
-                document.getElementById('badgeCountSupports').innerText = '0';
-                conteneur.innerHTML = '<p class="text-xs text-gray-400 italic text-center py-4">Sélectionnez un chantier</p>';
-                return;
-            }
-
-            const supports = [...new Set(rawData.filter(r => r.Chantier === chantierChoisi).map(r => r.Support))].filter(Boolean);
-            const supportsFiltres = supports.filter(s => s.toLowerCase().includes(filtre));
-            
-            document.getElementById('badgeCountSupports').innerText = supports.length;
-            conteneur.innerHTML = '';
-
-            if (supportsFiltres.length === 0) {
-                conteneur.innerHTML = '<p class="text-xs text-gray-400 italic text-center py-2">Aucun support</p>';
-                return;
-            }
-
-            const supportSelectionne = document.getElementById('selectSupport').value;
-
-            supportsFiltres.forEach(support => {
-                const isSelected = support === supportSelectionne;
-                // Calcul tâches du support
-                const lignes = rawData.filter(r => r.Chantier === chantierChoisi && r.Support === support);
-                const total = lignes.length;
-                const faites = lignes.filter(r => ['vrai', 'true', '1'].includes(String(r.Fait).toLowerCase().trim())).length;
-
-                const btn = document.createElement('button');
-                btn.className = `w-full text-left p-2 rounded-lg text-xs font-medium transition flex items-center justify-between ${isSelected ? 'bg-blue-600 text-white font-bold shadow' : 'bg-gray-50 hover:bg-gray-100 text-gray-700'}`;
-                btn.innerHTML = `
-                    <span class="truncate pr-2">${support}</span>
-                    <span class="text-[10px] px-1.5 py-0.5 rounded ${isSelected ? 'bg-blue-700 text-white' : 'bg-gray-200 text-gray-600'}">${faites}/${total}</span>
-                `;
-                btn.onclick = () => selectionnerSupportSidebar(support);
-                conteneur.appendChild(btn);
-            });
-        }
-
-        function selectionnerSupportSidebar(support) {
-            const selectSupport = document.getElementById('selectSupport');
-            selectSupport.value = support;
-            selectSupport.dispatchEvent(new Event('change'));
-            mettreAJourSidebarSupports();
-        }
-
-        function filtrerListesSidebars() {
-            mettreAJourSidebarChantiers();
-            mettreAJourSidebarSupports();
         }
 
         function changerOnglet(numPage) {
@@ -515,27 +507,20 @@
             selectSupport.innerHTML = '<option value="">Choisir...</option>';
             sectionTachesSupport.classList.add('hidden');
             sectionActionsRapides.classList.add('hidden');
+            document.getElementById('sectionLienFBM').classList.add('hidden');
             containerTaches.innerHTML = '';
-            
             const chantierChoisi = selectChantier.value;
             if (!chantierChoisi) {
                 selectSupport.disabled = true;
-                mettreAJourSidebarSupports();
-                mettreAJourSidebarChantiers();
                 return;
             }
-
             const supports = [...new Set(rawData.filter(r => r.Chantier === chantierChoisi).map(r => r.Support))].filter(Boolean);
             supports.forEach(s => selectSupport.add(new Option(s, s)));
             selectSupport.disabled = false;
-            
-            mettreAJourSidebarChantiers();
-            mettreAJourSidebarSupports();
         });
 
         selectSupport.addEventListener('change', () => {
             rafraichirAffichageTaches();
-            mettreAJourSidebarSupports();
         });
 
         function rafraichirAffichageTaches() {
@@ -547,6 +532,7 @@
                 sectionTachesSupport.classList.add('hidden');
                 sectionActionsRapides.classList.add('hidden');
                 containerActions.classList.add('hidden');
+                document.getElementById('sectionLienFBM').classList.add('hidden');
                 return;
             }
 
@@ -557,19 +543,17 @@
                 const isChecked = ['vrai', 'true', '1'].includes(String(item.Fait).toLowerCase().trim());
                 
                 const div = document.createElement('div');
-                div.className = `p-3 border rounded-lg flex flex-col sm:flex-row items-start sm:items-center gap-3 ${item.isCustom ? 'bg-amber-50 border-amber-200' : 'bg-gray-50'}`;
+                div.className = `p-3 border rounded-lg flex items-center gap-3 ${item.isCustom ? 'bg-amber-50 border-amber-200' : 'bg-gray-50'}`;
                 div.innerHTML = `
-                    <div class="flex items-center gap-3 w-full sm:w-auto">
-                        <input type="checkbox" ${isChecked ? 'checked' : ''} 
-                            onchange="modifierLigne(${indexGlobal}, 'Fait', this.checked)" 
-                            class="w-6 h-6 text-blue-600 rounded cursor-pointer shrink-0">
-                        <div class="flex-1 sm:flex-initial text-sm font-medium text-gray-800">
-                            ${item.Tache} ${item.isCustom ? '<span class="text-xs bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded font-bold ml-2">Ajout manuel</span>' : ''}
-                        </div>
+                    <input type="checkbox" ${isChecked ? 'checked' : ''} 
+                        onchange="modifierLigne(${indexGlobal}, 'Fait', this.checked)" 
+                        class="w-6 h-6 text-blue-600 rounded cursor-pointer">
+                    <div class="flex-1 text-sm font-medium text-gray-800">
+                        ${item.Tache} ${item.isCustom ? '<span class="text-xs bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded font-bold ml-2">Ajout manuel</span>' : ''}
                     </div>
                     <input type="text" value="${item.Observation || ''}" placeholder="Observation..." 
                         onchange="modifierLigne(${indexGlobal}, 'Observation', this.value)" 
-                        class="w-full sm:w-1/3 p-1.5 text-sm border rounded bg-white focus:ring-2 focus:ring-blue-500 sm:ml-auto">
+                        class="w-1/3 p-1.5 text-sm border rounded bg-white focus:ring-2 focus:ring-blue-500">
                 `;
                 containerTaches.appendChild(div);
             });
@@ -577,6 +561,7 @@
             sectionTachesSupport.classList.remove('hidden');
             sectionActionsRapides.classList.remove('hidden');
             containerActions.classList.remove('hidden');
+            document.getElementById('sectionLienFBM').classList.remove('hidden');
         }
 
         async function cocherToutSupport(etatVoulu) {
@@ -604,8 +589,6 @@
             }
 
             rafraichirAffichageTaches();
-            mettreAJourSidebarChantiers();
-            mettreAJourSidebarSupports();
         }
 
         async function modifierLigne(index, champ, valeur) {
@@ -613,11 +596,6 @@
             rawData[index].modifie = true;
 
             const ligne = rawData[index];
-            
-            // Mettre à jour l'affichage des sidebars en temps réel
-            mettreAJourSidebarChantiers();
-            mettreAJourSidebarSupports();
-
             if (!ligne.id) return;
 
             try {
@@ -673,8 +651,6 @@
 
                 document.getElementById('divAjoutTacheModal').classList.add('hidden');
                 rafraichirAffichageTaches();
-                mettreAJourSidebarChantiers();
-                mettreAJourSidebarSupports();
             } catch (err) {
                 console.error("Erreur d'insertion :", err);
                 alert("❌ Erreur lors de l'ajout de la tâche.");
@@ -865,6 +841,187 @@
 
             doc.save(fileName);
         }
+
+        /* ================= SIDEBARS GAUCHE / DROITE (comme FBM) ================= */
+        function verifierEtatBackdrop() {
+            const g = document.getElementById('menuParametres');
+            const d = document.getElementById('menuSupportsDroit');
+            const backdrop = document.getElementById('sidebarBackdrop');
+            if (g.style.width === "250px" || d.style.width === "280px") {
+                backdrop.classList.add('active');
+            } else {
+                backdrop.classList.remove('active');
+            }
+        }
+
+        function syncFooters() {
+            const wG = document.getElementById('menuParametres').style.width;
+            const wD = document.getElementById('menuSupportsDroit').style.width;
+            const fG = document.getElementById('footerGauche');
+            const fD = document.getElementById('footerDroit');
+            if (fG) fG.style.width = (wG && wG !== "0" && wG !== "0px") ? wG : "0";
+            if (fD) fD.style.width = (wD && wD !== "0" && wD !== "0px") ? wD : "0";
+        }
+
+        function fermerToutesSidebars() {
+            document.getElementById('menuParametres').style.width = "0";
+            document.getElementById('menuSupportsDroit').style.width = "0";
+            syncFooters();
+            verifierEtatBackdrop();
+        }
+
+        function basculerMenuParametres() {
+            const menu = document.getElementById('menuParametres');
+            document.getElementById('menuSupportsDroit').style.width = "0";
+            menu.style.width = (menu.style.width === "250px") ? "0" : "250px";
+            syncFooters();
+            verifierEtatBackdrop();
+        }
+
+        function basculerMenuSupportsDroit() {
+            // Pas de chantier choisi : on ouvre d'abord la liste des chantiers
+            if (!selectChantier.value) {
+                basculerMenuParametres();
+                return;
+            }
+            const menu = document.getElementById('menuSupportsDroit');
+            document.getElementById('menuParametres').style.width = "0";
+            if (menu.style.width === "280px") {
+                menu.style.width = "0";
+            } else {
+                menu.style.width = "280px";
+                mettreAJourBoutonsSupportsSidebar();
+                document.getElementById('filtreSupportInput').value = '';
+                filtrerListeSupportsDroite();
+            }
+            syncFooters();
+            verifierEtatBackdrop();
+        }
+
+        const STYLE_BTN_LISTE = "padding: 8px 12px; font-size: 14px; background: #222; color: #ccc; border: 1px solid #444; border-radius: 4px; text-align: left; cursor: pointer; transition: 0.2s; width: 100%;";
+
+        function styliserBoutonActif(btn) {
+            btn.style.backgroundColor = '#2563eb';
+            btn.style.color = '#fff';
+            btn.style.borderColor = '#3b82f6';
+            btn.style.fontWeight = 'bold';
+        }
+
+        function mettreAJourBoutonsChantiersSidebar() {
+            const container = document.getElementById('sidebarChantiersContainer');
+            const label = document.getElementById('labelChantierActif');
+            if (!container) return;
+            container.innerHTML = '';
+            let texteActif = "Aucun chantier";
+
+            Array.from(selectChantier.options).forEach(opt => {
+                if (!opt.value) return;
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.innerText = opt.text;
+                btn.style.cssText = STYLE_BTN_LISTE;
+                if (selectChantier.value === opt.value) {
+                    styliserBoutonActif(btn);
+                    texteActif = opt.text;
+                }
+                btn.onclick = () => {
+                    selectChantier.value = opt.value;
+                    selectChantier.dispatchEvent(new Event('change'));
+                    fermerToutesSidebars();
+                };
+                container.appendChild(btn);
+            });
+            if (label) label.innerText = texteActif;
+        }
+
+        function mettreAJourBoutonsSupportsSidebar() {
+            const container = document.getElementById('sidebarSupportsContainer');
+            const label = document.getElementById('labelSupportActif');
+            if (!container) return;
+            container.innerHTML = '';
+            let texteActif = "-- Choisir support --";
+
+            Array.from(selectSupport.options).forEach(opt => {
+                if (!opt.value) return;
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'support-sidebar-item';
+                btn.innerText = opt.text;
+                btn.style.cssText = STYLE_BTN_LISTE;
+                if (selectSupport.value === opt.value) {
+                    styliserBoutonActif(btn);
+                    texteActif = opt.text;
+                }
+                btn.onclick = () => {
+                    selectSupport.value = opt.value;
+                    selectSupport.dispatchEvent(new Event('change'));
+                    fermerToutesSidebars();
+                };
+                container.appendChild(btn);
+            });
+            if (label) label.innerText = texteActif;
+        }
+
+        function rafraichirSidebars() {
+            mettreAJourBoutonsChantiersSidebar();
+            mettreAJourBoutonsSupportsSidebar();
+        }
+
+        function filtrerListeSupportsDroite() {
+            const input = document.getElementById('filtreSupportInput');
+            const container = document.getElementById('sidebarSupportsContainer');
+            if (!input || !container) return;
+
+            const normalizeStr = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+            const filtre = normalizeStr(input.value);
+            const boutons = container.getElementsByClassName('support-sidebar-item');
+
+            let visibleCount = 0;
+            Array.from(boutons).forEach(btn => {
+                if (normalizeStr(btn.innerText).includes(filtre)) {
+                    btn.style.display = 'block';
+                    visibleCount++;
+                } else {
+                    btn.style.display = 'none';
+                }
+            });
+
+            let msg = document.getElementById('noResultSupportMsg');
+            if (visibleCount === 0 && filtre.length > 0) {
+                if (!msg) {
+                    msg = document.createElement('div');
+                    msg.id = 'noResultSupportMsg';
+                    msg.style.cssText = "color: #888; font-size: 13px; text-align: center; padding: 15px;";
+                    msg.innerText = "Aucun support trouvé.";
+                    container.appendChild(msg);
+                }
+                msg.style.display = 'block';
+            } else if (msg) {
+                msg.style.display = 'none';
+            }
+        }
+
+        // Actions des menus
+        function ouvrirOngletAdminDepuisMenu() {
+            fermerToutesSidebars();
+            changerOnglet(2);
+        }
+        function ouvrirFBMDepuisMenu() {
+            fermerToutesSidebars();
+            ouvrirFBM();
+        }
+        function actionCopierDepuisMenu() {
+            fermerToutesSidebars();
+            copierTravaux();
+        }
+        function actionPartagerPDFDepuisMenu() {
+            fermerToutesSidebars();
+            document.getElementById('btnSharePDF').click();
+        }
+
+        // Garde les sidebars et les libellés synchronisés avec les listes cachées
+        selectChantier.addEventListener('change', rafraichirSidebars);
+        selectSupport.addEventListener('change', rafraichirSidebars);
     </script>
 </body>
 </html>
