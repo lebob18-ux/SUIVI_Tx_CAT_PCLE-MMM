@@ -77,6 +77,13 @@
                 </div>
             </div>
 
+            <!-- Lien vers l'app FBM (visible quand un support est choisi) -->
+            <div id="sectionLienFBM" class="hidden mb-4">
+                <button onclick="ouvrirFBM()" class="w-full bg-orange-500 hover:bg-orange-600 text-white px-3 py-2.5 rounded-lg text-sm font-bold shadow transition flex items-center justify-center gap-2">
+                    <span>🚧</span> Ouvrir la fiche FBM (fouille / blindage)
+                </button>
+            </div>
+
             <!-- Boutons globaux pour cocher / décocher rapidement toutes les tâches du support -->
             <div id="sectionActionsRapides" class="hidden flex gap-2 mb-4">
                 <button onclick="cocherToutSupport(true)" class="bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1">
@@ -154,6 +161,54 @@ const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
         let userPrenom = localStorage.getItem('prenomSutx') || "";
         let userAdmin = false;
         let actionEnCours = null;
+
+        /* ================= LIEN QR / JUMELAGE FBM ================= */
+        // ⚠️ À ADAPTER : adresse exacte de l'app FBM (avec le / final)
+        const URL_FBM = "https://TON-COMPTE.github.io/DEPOT-FBM/";
+
+        // Paramètres lus dans le lien du QR (?chantier=...&support=...), gardés jusqu'à la fin du chargement
+        const paramsLien = new URLSearchParams(location.search);
+        let qrChantier = paramsLien.get('chantier') || "";
+        let qrSupport = paramsLien.get('support') || "";
+
+        function appliquerParamsQR() {
+            if (!qrChantier) return;
+            const norm = t => (t || '').toString().trim().toLowerCase();
+            const trouver = (sel, val) => Array.from(sel.options).find(o =>
+                o.value && (norm(o.value) === norm(val) || norm(o.text) === norm(val)));
+
+            const optC = trouver(selectChantier, qrChantier);
+            if (!optC) {
+                alert("Chantier « " + qrChantier + " » introuvable dans SUTX.");
+            } else {
+                selectChantier.value = optC.value;
+                selectChantier.dispatchEvent(new Event('change'));
+                if (qrSupport) {
+                    const optS = trouver(selectSupport, qrSupport);
+                    if (optS) {
+                        selectSupport.value = optS.value;
+                        selectSupport.dispatchEvent(new Event('change'));
+                    } else {
+                        alert("Support « " + qrSupport + " » introuvable pour ce chantier.");
+                    }
+                }
+            }
+            qrChantier = "";
+            qrSupport = "";
+            history.replaceState(null, '', location.pathname);
+        }
+
+        function ouvrirFBM() {
+            const chantier = selectChantier.value;
+            const support = selectSupport.value;
+            if (!chantier || !support) return;
+            if (URL_FBM.includes("TON-COMPTE")) {
+                alert("Adresse de FBM non configurée (constante URL_FBM).");
+                return;
+            }
+            location.href = URL_FBM + "?chantier=" + encodeURIComponent(chantier)
+                                    + "&support=" + encodeURIComponent(support);
+        }
 
         window.addEventListener('DOMContentLoaded', () => {
             if ('serviceWorker' in navigator) {
@@ -245,7 +300,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
 
                 if (error || !userRecord || userRecord.sutx !== true) {
                     // Accès révoqué ou utilisateur introuvable
-                    localStorage.clear();
+                    ['nomSutx', 'prenomSutx', 'emailSutx'].forEach(k => localStorage.removeItem(k));
                     document.getElementById('auth-overlay').classList.remove('hidden');
                     document.getElementById('main-app').classList.add('hidden');
                     if (userRecord && userRecord.sutx !== true) {
@@ -293,6 +348,8 @@ const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
                 const selectChantier = document.getElementById('selectChantier');
                 selectChantier.innerHTML = '<option value="">Choisir...</option>';
                 chantiers.forEach(c => selectChantier.add(new Option(c, c)));
+
+                appliquerParamsQR();
             } catch (err) {
                 console.error("Erreur de chargement des tâches :", err);
                 alert("Erreur lors du chargement des données de chantier.");
@@ -367,6 +424,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
             selectSupport.innerHTML = '<option value="">Choisir...</option>';
             sectionTachesSupport.classList.add('hidden');
             sectionActionsRapides.classList.add('hidden');
+            document.getElementById('sectionLienFBM').classList.add('hidden');
             containerTaches.innerHTML = '';
             const chantierChoisi = selectChantier.value;
             if (!chantierChoisi) {
@@ -391,6 +449,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
                 sectionTachesSupport.classList.add('hidden');
                 sectionActionsRapides.classList.add('hidden');
                 containerActions.classList.add('hidden');
+                document.getElementById('sectionLienFBM').classList.add('hidden');
                 return;
             }
 
@@ -419,6 +478,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
             sectionTachesSupport.classList.remove('hidden');
             sectionActionsRapides.classList.remove('hidden');
             containerActions.classList.remove('hidden');
+            document.getElementById('sectionLienFBM').classList.remove('hidden');
         }
 
         async function cocherToutSupport(etatVoulu) {
