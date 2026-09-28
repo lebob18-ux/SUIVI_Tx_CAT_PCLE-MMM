@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Suivi Travaux - SUTX avec Sidebars & Scan</title>
+    <title>Suivi Travaux - SUTX</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#2563eb">
     <link rel="icon" href="icon-192.png" type="image/png">
@@ -18,7 +18,7 @@
     <!-- SDK Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-<body class="bg-gray-100 min-h-screen flex flex-col">
+<body class="bg-gray-100 p-2 sm:p-4 min-h-screen flex flex-col justify-between">
 
     <!-- ÉCRAN D'IDENTIFICATION (Nom, Prénom, Email) -->
     <div id="auth-overlay" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
@@ -33,143 +33,125 @@
         </div>
     </div>
 
-    <!-- CONTENU PRINCIPAL AVEC LAYOUT 3 COLONNES (Sidebar Gauche, Centre, Sidebar Droite) -->
-    <div id="main-app" class="flex-1 flex flex-col hidden">
+    <!-- CONTENEUR GLOBAL AVEC SIDEBARS GAUCHE ET DROITE -->
+    <div id="main-app" class="w-full max-w-7xl mx-auto flex-1 flex flex-col xl:flex-row gap-4 items-start hidden">
         
-        <!-- Barre de navigation supérieure -->
-        <header class="bg-white shadow-sm px-6 py-3 flex justify-between items-center border-b">
-            <div class="flex items-center gap-4">
-                <h1 class="text-lg font-bold text-gray-800 flex items-center gap-2">⚡ SUTX - Suivi Caténaire</h1>
-                <div id="headerInfo" class="text-xs text-blue-700 font-semibold bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100"></div>
+        <!-- ================= SIDEBAR GAUCHE : LISTE DES CHANTIERS ================= -->
+        <aside class="w-full xl:w-72 bg-white rounded-xl shadow-md p-4 xl:sticky xl:top-4 flex flex-col max-h-[500px] xl:max-h-[calc(100vh-2rem)]">
+            <div class="flex items-center justify-between mb-3 border-b pb-2">
+                <h3 class="font-bold text-sm text-gray-800 flex items-center gap-1.5">
+                    <span>🏗️</span> Chantiers
+                </h3>
+                <span id="badgeCountChantiers" class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold">0</span>
             </div>
-            <!-- Onglets principaux -->
-            <div class="flex gap-2">
-                <button id="tabPage1" onclick="changerOnglet(1)" class="py-1.5 px-4 rounded-lg font-bold text-xs bg-blue-600 text-white shadow transition">
+            <!-- Filtre de recherche chantiers -->
+            <div class="mb-3">
+                <input type="text" id="filtreChantiers" placeholder="Rechercher chantier..." oninput="filtrerListesSidebars()" class="w-full p-2 border rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-gray-50">
+            </div>
+            <!-- Liste dynamique des chantiers -->
+            <div id="listeChantiersSidebar" class="overflow-y-auto space-y-1.5 flex-1 pr-1">
+                <p class="text-xs text-gray-400 italic text-center py-4">Chargement...</p>
+            </div>
+        </aside>
+
+        <!-- ================= CONTENU PRINCIPAL CENTRAL ================= -->
+        <main class="flex-1 w-full bg-white rounded-xl shadow-md p-4 sm:p-6">
+            
+            <!-- Barre des onglets de navigation -->
+            <div class="flex gap-2 mb-6 border-b pb-4">
+                <button id="tabPage1" onclick="changerOnglet(1)" class="flex-1 py-2 px-4 rounded-lg font-bold text-sm bg-blue-600 text-white shadow transition">
                     📋 Saisie & Suivi
                 </button>
-                <button id="tabPage2" onclick="changerOnglet(2)" class="py-1.5 px-4 rounded-lg font-bold text-xs bg-gray-200 text-gray-700 hover:bg-gray-300 transition hidden">
+                <button id="tabPage2" onclick="changerOnglet(2)" class="flex-1 py-2 px-4 rounded-lg font-bold text-sm bg-gray-200 text-gray-700 hover:bg-gray-300 transition hidden">
                     📊 Avancement Chantiers
                 </button>
             </div>
-        </header>
 
-        <!-- Corps de l'application en grille avec les deux Sidebars -->
-        <div class="flex-1 grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-4 p-4 max-w-7xl mx-auto w-full">
-            
-            <!-- ================= SIDEBAR GAUCHE : CHANTIERS & NAVIGATION ================= -->
-            <aside class="bg-white p-4 rounded-xl shadow-md md:col-span-1 flex flex-col gap-4 h-fit">
-                <div>
-                    <h2 class="text-xs font-bold uppercase text-gray-500 mb-2 tracking-wider">🏗️ Chantiers</h2>
-                    <select id="selectChantier" class="w-full p-2.5 border rounded-lg bg-gray-50 text-sm focus:ring-2 focus:ring-blue-500">
-                        <option value="">Choisir un chantier...</option>
-                    </select>
-                </div>
-
-                <!-- Module de Scan / Import Rapide intégré dans la Sidebar gauche -->
-                <div class="border-t pt-4">
-                    <h2 class="text-xs font-bold uppercase text-gray-500 mb-2 tracking-wider">📷 Scan & Documents</h2>
-                    <div class="flex flex-col gap-2">
-                        <label for="inputScanFile" class="cursor-pointer bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 p-2.5 rounded-lg text-xs font-bold text-center transition flex items-center justify-center gap-1.5">
-                            <span>📂</span> Importer / Scanner Fichier
-                        </label>
-                        <input type="file" id="inputScanFile" accept="image/*,application/pdf" class="hidden" onchange="traiterFichierScanne(event)">
-                        <button onclick="lancerAnalyseScan()" class="bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-lg text-xs font-bold shadow transition flex items-center justify-center gap-1.5">
-                            <span>🔍</span> Analyser le document
+            <!-- ================= PAGE 1 : SAISIE ================= -->
+            <div id="page1">
+                <div class="flex flex-wrap justify-between items-center mb-2 border-b pb-4 gap-2">
+                    <h1 class="text-xl font-bold text-gray-800">📋 Suivi des Travaux</h1>
+                    <div id="containerActions" class="hidden flex gap-2">
+                        <button id="btnCopier" onclick="copierTravaux()" class="bg-gray-800 hover:bg-gray-900 text-white px-3 py-2 rounded-lg font-bold text-sm shadow transition flex items-center gap-1.5">
+                            <span>📋</span> Copier
+                        </button>
+                        <button id="btnSharePDF" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg font-bold text-sm shadow transition flex items-center gap-1.5">
+                            <span>📄</span> Partager PDF
                         </button>
                     </div>
-                    <div id="scanResultat" class="mt-2 text-xs text-gray-600 bg-gray-50 p-2 rounded border hidden"></div>
+                </div>
+                
+                <div id="headerInfo" class="text-sm text-blue-700 mb-6 font-semibold bg-blue-50 p-2.5 rounded-lg border border-blue-100"></div>
+                
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Chantier :</label>
+                        <select id="selectChantier" class="w-full p-2.5 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500">
+                            <option value="">Choisir...</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Support :</label>
+                        <select id="selectSupport" class="w-full p-2.5 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500" disabled>
+                            <option value="">Choisir...</option>
+                        </select>
+                    </div>
                 </div>
 
-                <div class="border-t pt-4 mt-auto">
-                    <button onclick="deconnexion()" class="w-full bg-red-50 hover:bg-red-100 text-red-600 p-2 rounded-lg text-xs font-bold transition">
-                        🔒 Changer d'utilisateur
+                <!-- Boutons globaux pour cocher / décocher rapidement toutes les tâches du support -->
+                <div id="sectionActionsRapides" class="hidden flex flex-wrap gap-2 mb-4">
+                    <button onclick="cocherToutSupport(true)" class="bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1">
+                        <span>✅</span> Tout cocher sur ce support
+                    </button>
+                    <button onclick="cocherToutSupport(false)" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1">
+                        <span>❌</span> Tout décocher sur ce support
                     </button>
                 </div>
-            </aside>
 
-            <!-- ================= CONTENU CENTRAL ================= -->
-            <main class="bg-white p-6 rounded-xl shadow-md md:col-span-2 lg:col-span-3 flex flex-col">
-                
-                <!-- PAGE 1 : SAISIE -->
-                <div id="page1" class="flex-1 flex flex-col">
-                    <div class="flex flex-wrap justify-between items-center mb-4 border-b pb-3 gap-2">
-                        <h2 class="text-lg font-bold text-gray-800">📋 Liste des Travaux & Tâches</h2>
-                        <div id="containerActions" class="hidden flex gap-2">
-                            <button id="btnCopier" onclick="copierTravaux()" class="bg-gray-800 hover:bg-gray-900 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow transition flex items-center gap-1">
-                                <span>📋</span> Copier
-                            </button>
-                            <button id="btnSharePDF" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow transition flex items-center gap-1">
-                                <span>📄</span> PDF
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Actions rapides support -->
-                    <div id="sectionActionsRapides" class="hidden flex gap-2 mb-4">
-                        <button onclick="cocherToutSupport(true)" class="bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 border border-blue-200">
-                            <span>✅</span> Tout cocher
-                        </button>
-                        <button onclick="cocherToutSupport(false)" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1">
-                            <span>❌</span> Tout décocher
+                <div id="sectionTachesSupport" class="hidden space-y-3">
+                    <div class="flex justify-between items-center pt-2">
+                        <h3 class="font-bold text-sm text-gray-700">Liste des tâches :</h3>
+                        <button onclick="ouvrirModalAjoutTache()" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow transition flex items-center gap-1">
+                            <span>➕</span> Ajouter un travail non prévu
                         </button>
                     </div>
-
-                    <div id="sectionTachesSupport" class="hidden flex-1 flex flex-col space-y-3">
-                        <div class="flex justify-between items-center">
-                            <span id="labelSupportCourant" class="font-bold text-xs text-blue-600 uppercase"></span>
-                            <button onclick="ouvrirModalAjoutTache()" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow transition flex items-center gap-1">
-                                <span>➕</span> Ajouter tâche
-                            </button>
-                        </div>
-                        <div id="containerTaches" class="space-y-3 overflow-y-auto max-h-[60vh] pr-1"></div>
-                    </div>
-                    <div id="placeholderSelection" class="flex-1 flex items-center justify-center text-gray-400 text-sm italic py-12">
-                        Veuillez sélectionner un chantier et un support pour afficher les tâches.
-                    </div>
+                    <div id="containerTaches" class="space-y-3"></div>
                 </div>
+            </div>
 
-                <!-- PAGE 2 : AVANCEMENT CHANTIERS -->
-                <div id="page2" class="hidden flex-1 flex flex-col">
-                    <div class="flex justify-between items-center mb-4 border-b pb-3">
-                        <h2 class="text-lg font-bold text-gray-800">📊 Avancement Global des Chantiers</h2>
-                        <button onclick="partagerPDFAvancement()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg font-bold shadow transition flex items-center gap-1 text-xs">
-                            <span>📲</span> Partager PDF Avancement
-                        </button>
-                    </div>
-                    <div id="conteneurAvancement" class="space-y-4 overflow-y-auto max-h-[65vh]">
-                        <p class="text-gray-500 text-sm italic text-center py-4">Chargement de l'avancement...</p>
-                    </div>
+            <!-- ================= PAGE 2 : AVANCEMENT CHANTIERS ================= -->
+            <div id="page2" class="hidden">
+                <div class="flex justify-between items-center mb-4 border-b pb-4">
+                    <h2 class="text-xl font-bold text-gray-800">📊 Avancement Global des Chantiers</h2>
+                    <button onclick="partagerPDFAvancement()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold shadow transition flex items-center gap-2 text-sm">
+                        <span>📲</span> Partager PDF Avancement
+                    </button>
                 </div>
-
-            </main>
-
-            <!-- ================= SIDEBAR DROITE : SUPPORTS & FILTRES RAPIDES ================= -->
-            <aside class="bg-white p-4 rounded-xl shadow-md md:col-span-1 flex flex-col gap-4 h-fit">
-                <div>
-                    <h2 class="text-xs font-bold uppercase text-gray-500 mb-2 tracking-wider">🗼 Supports</h2>
-                    <select id="selectSupport" class="w-full p-2.5 border rounded-lg bg-gray-50 text-sm focus:ring-2 focus:ring-blue-500" disabled>
-                        <option value="">Choisir un support...</option>
-                    </select>
+                <div id="conteneurAvancement" class="space-y-4">
+                    <p class="text-gray-500 text-sm italic text-center py-4">Chargement de l'avancement...</p>
                 </div>
+            </div>
 
-                <div class="border-t pt-4">
-                    <h2 class="text-xs font-bold uppercase text-gray-500 mb-2 tracking-wider">📌 Filtres & Infos</h2>
-                    <div class="space-y-2 text-xs text-gray-600">
-                        <div class="bg-gray-50 p-2.5 rounded border">
-                            <span class="font-bold block text-gray-700 mb-1">État de session :</span>
-                            <span id="sidebarStatutSession" class="text-blue-600 font-semibold">En attente de RJ</span>
-                        </div>
-                        <div class="bg-gray-50 p-2.5 rounded border">
-                            <span class="font-bold block text-gray-700 mb-1">Actions rapides :</span>
-                            <button onclick="verifierModificationsEtDemanderRJ('pdf')" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-1.5 px-2 rounded font-bold transition text-center">
-                                Générer Rapport PDF
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </aside>
+        </main>
 
-        </div>
+        <!-- ================= SIDEBAR DROITE : LISTE DES SUPPORTS ================= -->
+        <aside class="w-full xl:w-72 bg-white rounded-xl shadow-md p-4 xl:sticky xl:top-4 flex flex-col max-h-[500px] xl:max-h-[calc(100vh-2rem)]">
+            <div class="flex items-center justify-between mb-3 border-b pb-2">
+                <h3 class="font-bold text-sm text-gray-800 flex items-center gap-1.5">
+                    <span>📌</span> Supports
+                </h3>
+                <span id="badgeCountSupports" class="text-xs bg-gray-100 text-gray-800 px-2 py-0.5 rounded-full font-bold">0</span>
+            </div>
+            <!-- Filtre de recherche supports -->
+            <div class="mb-3">
+                <input type="text" id="filtreSupports" placeholder="Rechercher support..." oninput="filtrerListesSidebars()" class="w-full p-2 border rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-gray-50">
+            </div>
+            <!-- Liste dynamique des supports -->
+            <div id="listeSupportsSidebar" class="overflow-y-auto space-y-1.5 flex-1 pr-1">
+                <p class="text-xs text-gray-400 italic text-center py-4">Sélectionnez un chantier</p>
+            </div>
+        </aside>
+
     </div>
 
     <!-- Modale RJ -->
@@ -177,10 +159,10 @@
         <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-sm text-center">
             <p class="font-bold text-lg mb-2 text-gray-800">🌙 Numéro RJ requis</p>
             <p class="text-xs text-gray-600 mb-4">Veuillez indiquer le numéro RJ pour valider cette action :</p>
-            <input type="text" id="rjInput" placeholder="Numéro RJ" class="w-full p-2.5 border rounded-lg mb-4 text-center font-bold focus:ring-2 focus:ring-blue-500 text-sm">
+            <input type="text" id="rjInput" placeholder="Numéro RJ" class="w-full p-2 border rounded-lg mb-4 text-center font-bold focus:ring-2 focus:ring-blue-500">
             <div class="flex gap-2">
-                <button onclick="executerActionEnAttente()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white p-2.5 rounded-lg font-bold text-sm">✅ Valider</button>
-                <button onclick="document.getElementById('divRJModal').classList.add('hidden')" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 p-2.5 rounded-lg font-bold text-sm">❌ Annuler</button>
+                <button onclick="executerActionEnAttente()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-lg font-bold text-sm">✅ Valider</button>
+                <button onclick="document.getElementById('divRJModal').classList.add('hidden')" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 p-2 rounded-lg font-bold text-sm">❌ Annuler</button>
             </div>
         </div>
     </div>
@@ -193,8 +175,8 @@
             <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Intitulé de la tâche :</label>
             <input type="text" id="inputNouvelleTache" placeholder="Ex: Reprise fondation spécifique..." class="w-full p-2.5 border rounded-lg mb-4 text-sm focus:ring-2 focus:ring-blue-500">
             <div class="flex gap-2">
-                <button onclick="validerAjoutTacheManuelle()" class="flex-1 bg-green-600 hover:bg-green-700 text-white p-2.5 rounded-lg font-bold text-sm">✅ Ajouter</button>
-                <button onclick="document.getElementById('divAjoutTacheModal').classList.add('hidden')" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 p-2.5 rounded-lg font-bold text-sm">❌ Annuler</button>
+                <button onclick="validerAjoutTacheManuelle()" class="flex-1 bg-green-600 hover:bg-green-700 text-white p-2 rounded-lg font-bold text-sm">✅ Ajouter</button>
+                <button onclick="document.getElementById('divAjoutTacheModal').classList.add('hidden')" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 p-2 rounded-lg font-bold text-sm">❌ Annuler</button>
             </div>
         </div>
     </div>
@@ -213,11 +195,16 @@
         let userPrenom = localStorage.getItem('prenomSutx') || "";
         let userAdmin = false;
         let actionEnCours = null;
-        let fichierScanneActif = null;
 
         window.addEventListener('DOMContentLoaded', () => {
-            if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('sw.js').catch(console.error);
+            try {
+                if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.register('sw.js').catch(() => {
+                        // Ignorer silencieusement si sw.js n'est pas trouvé ou non supporté
+                    });
+                }
+            } catch (e) {
+                // Ignore SW errors in preview environments
             }
 
             if (userEmail && userName) {
@@ -252,7 +239,7 @@
                 if (!userRecord) {
                     const { data: newRecord, error: insertError } = await supabaseClient
                         .from('app_bob')
-                    .insert([
+                        .insert([
                             { email: emailInput, nom: nomInput, prenom: prenomInput, sutx: false, admin: false }
                         ])
                         .select()
@@ -300,7 +287,9 @@
                     .maybeSingle();
 
                 if (error || !userRecord || userRecord.sutx !== true) {
-                    deconnexion();
+                    localStorage.clear();
+                    document.getElementById('auth-overlay').classList.remove('hidden');
+                    document.getElementById('main-app').classList.add('hidden');
                     if (userRecord && userRecord.sutx !== true) {
                         const errorEl = document.getElementById('auth-error');
                         errorEl.textContent = "❌ Votre accès SUTX a été désactivé.";
@@ -316,16 +305,10 @@
             }
         }
 
-        function deconnexion() {
-            localStorage.clear();
-            document.getElementById('auth-overlay').classList.remove('hidden');
-            document.getElementById('main-app').classList.add('hidden');
-        }
-
         function lancerApplication() {
             document.getElementById('auth-overlay').classList.add('hidden');
             document.getElementById('main-app').classList.remove('hidden');
-            document.getElementById('headerInfo').innerText = `👤 ${userPrenom} ${userName}`;
+            document.getElementById('headerInfo').innerText = `👤 SUTX : ${userPrenom} ${userName}`;
 
             if (userAdmin) {
                 document.getElementById('tabPage2').classList.remove('hidden');
@@ -347,14 +330,121 @@
 
                 rawData = (data || []).map(r => ({ ...r, modifie: false, isCustom: false }));
                 
-                const chantiers = [...new Set(rawData.map(r => r.Chantier))].filter(Boolean);
-                const selectChantier = document.getElementById('selectChantier');
-                selectChantier.innerHTML = '<option value="">Choisir un chantier...</option>';
-                chantiers.forEach(c => selectChantier.add(new Option(c, c)));
+                peuplerSelectChantiers();
+                mettreAJourSidebarChantiers();
             } catch (err) {
                 console.error("Erreur de chargement des tâches :", err);
                 alert("Erreur lors du chargement des données de chantier.");
             }
+        }
+
+        function peuplerSelectChantiers() {
+            const chantiers = [...new Set(rawData.map(r => r.Chantier))].filter(Boolean);
+            const selectChantier = document.getElementById('selectChantier');
+            const valeurActuelle = selectChantier.value;
+            
+            selectChantier.innerHTML = '<option value="">Choisir...</option>';
+            chantiers.forEach(c => selectChantier.add(new Option(c, c)));
+            
+            if (chantiers.includes(valeurActuelle)) {
+                selectChantier.value = valeurActuelle;
+            }
+        }
+
+        function mettreAJourSidebarChantiers() {
+            const filtre = document.getElementById('filtreChantiers').value.toLowerCase();
+            const chantiers = [...new Set(rawData.map(r => r.Chantier))].filter(Boolean);
+            const chantiersFiltres = chantiers.filter(c => c.toLowerCase().includes(filtre));
+            
+            const conteneur = document.getElementById('listeChantiersSidebar');
+            document.getElementById('badgeCountChantiers').innerText = chantiers.length;
+            conteneur.innerHTML = '';
+
+            if (chantiersFiltres.length === 0) {
+                conteneur.innerHTML = '<p class="text-xs text-gray-400 italic text-center py-2">Aucun chantier</p>';
+                return;
+            }
+
+            const chantierSelectionne = document.getElementById('selectChantier').value;
+
+            chantiersFiltres.forEach(chantier => {
+                const isSelected = chantier === chantierSelectionne;
+                // Calcul du pourcentage d'avancement pour le badge du chantier
+                const lignes = rawData.filter(r => r.Chantier === chantier);
+                const total = lignes.length;
+                const faites = lignes.filter(r => ['vrai', 'true', '1'].includes(String(r.Fait).toLowerCase().trim())).length;
+                const pct = total > 0 ? Math.round((faites / total) * 100) : 0;
+
+                const btn = document.createElement('button');
+                btn.className = `w-full text-left p-2 rounded-lg text-xs font-medium transition flex items-center justify-between ${isSelected ? 'bg-blue-600 text-white font-bold shadow' : 'bg-gray-50 hover:bg-gray-100 text-gray-700'}`;
+                btn.innerHTML = `
+                    <span class="truncate pr-2">${chantier}</span>
+                    <span class="text-[10px] px-1.5 py-0.5 rounded ${isSelected ? 'bg-blue-700 text-white' : 'bg-gray-200 text-gray-600'}">${pct}%</span>
+                `;
+                btn.onclick = () => selectionnerChantierSidebar(chantier);
+                conteneur.appendChild(btn);
+            });
+        }
+
+        function selectionnerChantierSidebar(chantier) {
+            const selectChantier = document.getElementById('selectChantier');
+            selectChantier.value = chantier;
+            selectChantier.dispatchEvent(new Event('change'));
+            mettreAJourSidebarChantiers();
+        }
+
+        function mettreAJourSidebarSupports() {
+            const chantierChoisi = document.getElementById('selectChantier').value;
+            const filtre = document.getElementById('filtreSupports').value.toLowerCase();
+            const conteneur = document.getElementById('listeSupportsSidebar');
+            
+            if (!chantierChoisi) {
+                document.getElementById('badgeCountSupports').innerText = '0';
+                conteneur.innerHTML = '<p class="text-xs text-gray-400 italic text-center py-4">Sélectionnez un chantier</p>';
+                return;
+            }
+
+            const supports = [...new Set(rawData.filter(r => r.Chantier === chantierChoisi).map(r => r.Support))].filter(Boolean);
+            const supportsFiltres = supports.filter(s => s.toLowerCase().includes(filtre));
+            
+            document.getElementById('badgeCountSupports').innerText = supports.length;
+            conteneur.innerHTML = '';
+
+            if (supportsFiltres.length === 0) {
+                conteneur.innerHTML = '<p class="text-xs text-gray-400 italic text-center py-2">Aucun support</p>';
+                return;
+            }
+
+            const supportSelectionne = document.getElementById('selectSupport').value;
+
+            supportsFiltres.forEach(support => {
+                const isSelected = support === supportSelectionne;
+                // Calcul tâches du support
+                const lignes = rawData.filter(r => r.Chantier === chantierChoisi && r.Support === support);
+                const total = lignes.length;
+                const faites = lignes.filter(r => ['vrai', 'true', '1'].includes(String(r.Fait).toLowerCase().trim())).length;
+
+                const btn = document.createElement('button');
+                btn.className = `w-full text-left p-2 rounded-lg text-xs font-medium transition flex items-center justify-between ${isSelected ? 'bg-blue-600 text-white font-bold shadow' : 'bg-gray-50 hover:bg-gray-100 text-gray-700'}`;
+                btn.innerHTML = `
+                    <span class="truncate pr-2">${support}</span>
+                    <span class="text-[10px] px-1.5 py-0.5 rounded ${isSelected ? 'bg-blue-700 text-white' : 'bg-gray-200 text-gray-600'}">${faites}/${total}</span>
+                `;
+                btn.onclick = () => selectionnerSupportSidebar(support);
+                conteneur.appendChild(btn);
+            });
+        }
+
+        function selectionnerSupportSidebar(support) {
+            const selectSupport = document.getElementById('selectSupport');
+            selectSupport.value = support;
+            selectSupport.dispatchEvent(new Event('change'));
+            mettreAJourSidebarSupports();
+        }
+
+        function filtrerListesSidebars() {
+            mettreAJourSidebarChantiers();
+            mettreAJourSidebarSupports();
         }
 
         function changerOnglet(numPage) {
@@ -371,13 +461,13 @@
             if (numPage === 1) {
                 page1.classList.remove('hidden');
                 page2.classList.add('hidden');
-                tab1.className = "py-1.5 px-4 rounded-lg font-bold text-xs bg-blue-600 text-white shadow transition";
-                tab2.className = "py-1.5 px-4 rounded-lg font-bold text-xs bg-gray-200 text-gray-700 hover:bg-gray-300 transition";
+                tab1.className = "flex-1 py-2 px-4 rounded-lg font-bold text-sm bg-blue-600 text-white shadow transition";
+                tab2.className = "flex-1 py-2 px-4 rounded-lg font-bold text-sm bg-gray-200 text-gray-700 hover:bg-gray-300 transition";
             } else {
                 page1.classList.add('hidden');
                 page2.classList.remove('hidden');
-                tab2.className = "py-1.5 px-4 rounded-lg font-bold text-xs bg-blue-600 text-white shadow transition";
-                tab1.className = "py-1.5 px-4 rounded-lg font-bold text-xs bg-gray-200 text-gray-700 hover:bg-gray-300 transition";
+                tab2.className = "flex-1 py-2 px-4 rounded-lg font-bold text-sm bg-blue-600 text-white shadow transition";
+                tab1.className = "flex-1 py-2 px-4 rounded-lg font-bold text-sm bg-gray-200 text-gray-700 hover:bg-gray-300 transition";
                 calculerEtAfficherAvancement();
             }
         }
@@ -403,11 +493,11 @@
                 divChantier.className = "bg-gray-50 p-4 border rounded-lg shadow-sm";
                 divChantier.innerHTML = `
                     <div class="flex justify-between items-center mb-2">
-                        <span class="font-bold text-gray-800 text-sm">${chantier}</span>
-                        <span class="text-xs font-semibold text-blue-600">${tachesFaites} / ${totalTaches} (${pourcentage}%)</span>
+                        <span class="font-bold text-gray-800">${chantier}</span>
+                        <span class="text-sm font-semibold text-blue-600">${tachesFaites} / ${totalTaches} (${pourcentage}%)</span>
                     </div>
-                    <div class="w-full bg-gray-200 rounded-full h-2.5">
-                        <div class="bg-blue-600 h-2.5 rounded-full transition-all duration-500" style="width: ${pourcentage}%"></div>
+                    <div class="w-full bg-gray-200 rounded-full h-3">
+                        <div class="bg-blue-600 h-3 rounded-full transition-all duration-500" style="width: ${pourcentage}%"></div>
                     </div>
                 `;
                 conteneur.appendChild(divChantier);
@@ -420,28 +510,32 @@
         const sectionTachesSupport = document.getElementById('sectionTachesSupport');
         const sectionActionsRapides = document.getElementById('sectionActionsRapides');
         const containerActions = document.getElementById('containerActions');
-        const placeholderSelection = document.getElementById('placeholderSelection');
 
         selectChantier.addEventListener('change', () => {
-            selectSupport.innerHTML = '<option value="">Choisir un support...</option>';
+            selectSupport.innerHTML = '<option value="">Choisir...</option>';
             sectionTachesSupport.classList.add('hidden');
             sectionActionsRapides.classList.add('hidden');
-            containerActions.classList.add('hidden');
-            placeholderSelection.classList.remove('hidden');
             containerTaches.innerHTML = '';
             
             const chantierChoisi = selectChantier.value;
             if (!chantierChoisi) {
                 selectSupport.disabled = true;
+                mettreAJourSidebarSupports();
+                mettreAJourSidebarChantiers();
                 return;
             }
+
             const supports = [...new Set(rawData.filter(r => r.Chantier === chantierChoisi).map(r => r.Support))].filter(Boolean);
             supports.forEach(s => selectSupport.add(new Option(s, s)));
             selectSupport.disabled = false;
+            
+            mettreAJourSidebarChantiers();
+            mettreAJourSidebarSupports();
         });
 
         selectSupport.addEventListener('change', () => {
             rafraichirAffichageTaches();
+            mettreAJourSidebarSupports();
         });
 
         function rafraichirAffichageTaches() {
@@ -453,12 +547,8 @@
                 sectionTachesSupport.classList.add('hidden');
                 sectionActionsRapides.classList.add('hidden');
                 containerActions.classList.add('hidden');
-                placeholderSelection.classList.remove('hidden');
                 return;
             }
-
-            placeholderSelection.classList.add('hidden');
-            document.getElementById('labelSupportCourant').innerText = `Support : ${supportChoisi}`;
 
             const lignesFiltrees = rawData.filter(r => r.Chantier === chantierChoisi && r.Support === supportChoisi);
 
@@ -467,17 +557,19 @@
                 const isChecked = ['vrai', 'true', '1'].includes(String(item.Fait).toLowerCase().trim());
                 
                 const div = document.createElement('div');
-                div.className = `p-3 border rounded-lg flex items-center gap-3 ${item.isCustom ? 'bg-amber-50 border-amber-200' : 'bg-gray-50'}`;
+                div.className = `p-3 border rounded-lg flex flex-col sm:flex-row items-start sm:items-center gap-3 ${item.isCustom ? 'bg-amber-50 border-amber-200' : 'bg-gray-50'}`;
                 div.innerHTML = `
-                    <input type="checkbox" ${isChecked ? 'checked' : ''} 
-                        onchange="modifierLigne(${indexGlobal}, 'Fait', this.checked)" 
-                        class="w-5 h-5 text-blue-600 rounded cursor-pointer">
-                    <div class="flex-1 text-xs font-medium text-gray-800">
-                        ${item.Tache} ${item.isCustom ? '<span class="text-[10px] bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded font-bold ml-1">Manuel</span>' : ''}
+                    <div class="flex items-center gap-3 w-full sm:w-auto">
+                        <input type="checkbox" ${isChecked ? 'checked' : ''} 
+                            onchange="modifierLigne(${indexGlobal}, 'Fait', this.checked)" 
+                            class="w-6 h-6 text-blue-600 rounded cursor-pointer shrink-0">
+                        <div class="flex-1 sm:flex-initial text-sm font-medium text-gray-800">
+                            ${item.Tache} ${item.isCustom ? '<span class="text-xs bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded font-bold ml-2">Ajout manuel</span>' : ''}
+                        </div>
                     </div>
                     <input type="text" value="${item.Observation || ''}" placeholder="Observation..." 
                         onchange="modifierLigne(${indexGlobal}, 'Observation', this.value)" 
-                        class="w-1/3 p-1.5 text-xs border rounded bg-white focus:ring-2 focus:ring-blue-500">
+                        class="w-full sm:w-1/3 p-1.5 text-sm border rounded bg-white focus:ring-2 focus:ring-blue-500 sm:ml-auto">
                 `;
                 containerTaches.appendChild(div);
             });
@@ -512,6 +604,8 @@
             }
 
             rafraichirAffichageTaches();
+            mettreAJourSidebarChantiers();
+            mettreAJourSidebarSupports();
         }
 
         async function modifierLigne(index, champ, valeur) {
@@ -519,6 +613,11 @@
             rawData[index].modifie = true;
 
             const ligne = rawData[index];
+            
+            // Mettre à jour l'affichage des sidebars en temps réel
+            mettreAJourSidebarChantiers();
+            mettreAJourSidebarSupports();
+
             if (!ligne.id) return;
 
             try {
@@ -574,37 +673,17 @@
 
                 document.getElementById('divAjoutTacheModal').classList.add('hidden');
                 rafraichirAffichageTaches();
+                mettreAJourSidebarChantiers();
+                mettreAJourSidebarSupports();
             } catch (err) {
                 console.error("Erreur d'insertion :", err);
                 alert("❌ Erreur lors de l'ajout de la tâche.");
             }
         }
 
-        // Fonctions pour le module Scan / Fichiers techniques
-        function traiterFichierScanne(event) {
-            const file = event.target.files[0];
-            const resultDiv = document.getElementById('scanResultat');
-            if (!file) return;
-
-            fichierScanneActif = file;
-            resultDiv.classList.remove('hidden');
-            resultDiv.innerHTML = `📄 <strong>Fichier chargé :</strong> ${file.name}`;
-        }
-
-        function lancerAnalyseScan() {
-            const resultDiv = document.getElementById('scanResultat');
-            if (!fichierScanneActif) {
-                alert("Veuillez d'abord importer ou scanner un fichier (PDF ou image).");
-                return;
-            }
-
-            resultDiv.classList.remove('hidden');
-            resultDiv.innerHTML = `🔍 Analyse en cours de <em>${fichierScanneActif.name}</em>...<br>Recherche des paramètres (1500V, 25000V, schémas)...`;
-            
-            setTimeout(() => {
-                resultDiv.innerHTML = `✅ Analyse terminée pour <strong>${fichierScanneActif.name}</strong>.<br><span class="text-green-600 font-bold">Données prêtes à être intégrées.</span>`;
-            }, 1200);
-        }
+        document.getElementById('btnSharePDF').addEventListener('click', () => {
+            verifierModificationsEtDemanderRJ('pdf');
+        });
 
         function copierTravaux() {
             copierDansPressePapier();
@@ -631,8 +710,7 @@
             }
             sessionRJ = saisiRJ;
             document.getElementById('divRJModal').classList.add('hidden');
-            document.getElementById('headerInfo').innerText = `👤 ${userPrenom} ${userName} | 📌 RJ : ${sessionRJ}`;
-            document.getElementById('sidebarStatutSession').innerText = `RJ Actif : ${sessionRJ}`;
+            document.getElementById('headerInfo').innerText = `👤 SUTX : ${userPrenom} ${userName} | 📌 RJ : ${sessionRJ}`;
 
             if (actionEnCours === 'pdf') {
                 genererEtPartagerPDF();
@@ -643,7 +721,7 @@
             const elementsFaites = rawData.filter(r => r.modifie === true && ['vrai', 'true', '1'].includes(String(r.Fait).toLowerCase().trim()));
 
             if (elementsFaites.length === 0) {
-                alert("Aucun travail validé trouvé pour la copie.");
+                alert("Aucun travail validé (coché fait) n'a été trouvé pour la copie.");
                 return;
             }
 
