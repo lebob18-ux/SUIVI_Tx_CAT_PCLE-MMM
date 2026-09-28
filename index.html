@@ -1022,6 +1022,72 @@ const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
         // Garde les sidebars et les libellés synchronisés avec les listes cachées
         selectChantier.addEventListener('change', rafraichirSidebars);
         selectSupport.addEventListener('change', rafraichirSidebars);
+
+        /* ================= OUVERTURE / FERMETURE DES SIDEBARS AU GLISSER ================= */
+        (function () {
+            const SEUIL_DISTANCE = 60;   // px minimum de glissement horizontal
+            const RATIO_HORIZONTAL = 1.5; // le geste doit être nettement plus horizontal que vertical
+            const ZONE_DEPART = 0.30;    // départ dans les 30 % gauche (ouvrir gauche) ou droite (ouvrir droite)
+
+            let dep = null;
+
+            function surChampOuDefilement(el) {
+                while (el && el !== document.body) {
+                    const tag = el.tagName;
+                    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+                    const ox = getComputedStyle(el).overflowX;
+                    if ((ox === 'auto' || ox === 'scroll') && el.scrollWidth > el.clientWidth + 1) return true;
+                    el = el.parentElement;
+                }
+                return false;
+            }
+
+            function modaleOuverte() {
+                return ['auth-overlay', 'divRJModal', 'divAjoutTacheModal'].some(id => {
+                    const e = document.getElementById(id);
+                    return e && !e.classList.contains('hidden');
+                });
+            }
+
+            document.addEventListener('touchstart', (e) => {
+                if (e.touches.length !== 1 || modaleOuverte()) { dep = null; return; }
+                const t = e.touches[0];
+                const dansSidebar = e.target.closest && e.target.closest('.sidebar, .sidebar-right');
+                dep = {
+                    x: t.clientX,
+                    y: t.clientY,
+                    bloque: !dansSidebar && surChampOuDefilement(e.target)
+                };
+            }, { passive: true });
+
+            document.addEventListener('touchend', (e) => {
+                if (!dep) return;
+                const d = dep;
+                dep = null;
+                if (d.bloque || modaleOuverte()) return;
+
+                const t = e.changedTouches[0];
+                const dx = t.clientX - d.x;
+                const dy = t.clientY - d.y;
+                if (Math.abs(dx) < SEUIL_DISTANCE || Math.abs(dx) < Math.abs(dy) * RATIO_HORIZONTAL) return;
+
+                const gaucheOuverte = document.getElementById('menuParametres').style.width === '250px';
+                const droiteOuverte = document.getElementById('menuSupportsDroit').style.width === '280px';
+                const largeur = window.innerWidth;
+
+                if (dx > 0) {
+                    // glisser vers la droite : ferme la sidebar droite, sinon ouvre la gauche depuis le bord gauche
+                    if (droiteOuverte) fermerToutesSidebars();
+                    else if (!gaucheOuverte && d.x <= largeur * ZONE_DEPART) basculerMenuParametres();
+                } else {
+                    // glisser vers la gauche : ferme la sidebar gauche, sinon ouvre la droite depuis le bord droit
+                    if (gaucheOuverte) fermerToutesSidebars();
+                    else if (!droiteOuverte && d.x >= largeur * (1 - ZONE_DEPART)) basculerMenuSupportsDroit();
+                }
+            }, { passive: true });
+
+            document.addEventListener('touchcancel', () => { dep = null; }, { passive: true });
+        })();
     </script>
 </body>
 </html>
