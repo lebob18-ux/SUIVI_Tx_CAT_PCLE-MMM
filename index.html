@@ -9,7 +9,7 @@
     <link rel="icon" href="icon-192.png" type="image/png">
 
     <!-- Tailwind CSS, SheetJS, PapaParse -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <!-- jsPDF et AutoTable pour un PDF pro -->
@@ -19,10 +19,14 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <!-- HTML5 QR Code Scanner -->
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <style>
+        /* Classes utilitaires pour les transitions de sidebar */
+        .sidebar-transition { transition: transform 0.3s ease-in-out; }
+    </style>
 </head>
 <body class="bg-gray-100 p-4 min-h-screen">
 
-    <!-- ÉCRAN D'IDENTIFICATION (Nom, Prénom, Email) -->
+    <!-- ÉCRAN D'IDENTIFICATION -->
     <div id="auth-overlay" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
         <div class="bg-white p-6 rounded-xl shadow-xl w-full max-w-sm text-center">
             <h2 class="text-xl font-bold text-gray-800 mb-2">🔐 Identification SUTX</h2>
@@ -35,52 +39,94 @@
         </div>
     </div>
 
-    <!-- ================= SIDEBAR & OVERLAY ================= -->
-    <div id="sidebar-overlay" onclick="toggleSidebar()" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity"></div>
-    <div id="sidebar" class="fixed inset-y-0 left-0 w-72 bg-white shadow-2xl z-50 transform -translate-x-full transition-transform duration-300 flex flex-col">
-        <div class="p-5 bg-blue-600 text-white flex justify-between items-center">
+    <!-- ================= OVERLAY GLOBAL POUR FERMER LES SIDEBARS AU CLIC DEHORS ================= -->
+    <div id="sidebar-overlay" onclick="fermerToutesSidebars()" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity"></div>
+
+    <!-- ================= SIDEBAR GAUCHE (MENU & CHANTIERS) ================= -->
+    <div id="sidebar-left" class="fixed inset-y-0 left-0 w-80 bg-white shadow-2xl z-55 transform -translate-x-full sidebar-transition flex flex-col">
+        <div class="p-4 bg-blue-600 text-white flex justify-between items-center">
             <div>
-                <h2 class="font-bold text-lg">Menu SUTX</h2>
+                <h2 class="font-bold text-base">Menu & Chantiers</h2>
                 <p id="sidebarUserInfo" class="text-xs text-blue-100 mt-0.5">Chargement...</p>
             </div>
-            <button onclick="toggleSidebar()" class="text-white hover:bg-blue-700 p-2 rounded-lg text-lg">✕</button>
+            <button onclick="toggleSidebarLeft()" class="text-white hover:bg-blue-700 p-2 rounded-lg text-lg">✕</button>
         </div>
-        <div class="flex-1 p-4 space-y-2 overflow-y-auto">
-            <button onclick="toggleSidebar(); changerOnglet(1);" class="w-full text-left px-4 py-2.5 rounded-lg hover:bg-blue-50 font-semibold text-gray-700 flex items-center gap-3">
-                <span>📋</span> Saisie & Suivi
-            </button>
-            <button id="sidebarTab2" onclick="toggleSidebar(); changerOnglet(2);" class="w-full text-left px-4 py-2.5 rounded-lg hover:bg-blue-50 font-semibold text-gray-700 flex items-center gap-3 hidden">
-                <span>📊</span> Avancement Chantiers
-            </button>
-            <button onclick="toggleSidebar(); ouvrirScannerQR();" class="w-full text-left px-4 py-2.5 rounded-lg hover:bg-blue-50 font-semibold text-gray-700 flex items-center gap-3">
-                <span>📷</span> Scanner QR Code Support
-            </button>
+        
+        <div class="flex-1 p-4 space-y-4 overflow-y-auto">
+            <!-- Navigation Générale -->
+            <div class="space-y-1 pb-3 border-b">
+                <button onclick="toggleSidebarLeft(); changerOnglet(1);" class="w-full text-left px-3 py-2 rounded-lg hover:bg-blue-50 font-semibold text-gray-700 text-sm flex items-center gap-2">
+                    <span>📋</span> Saisie & Suivi
+                </button>
+                <button id="sidebarTab2" onclick="toggleSidebarLeft(); changerOnglet(2);" class="w-full text-left px-3 py-2 rounded-lg hover:bg-blue-50 font-semibold text-gray-700 text-sm flex items-center gap-2 hidden">
+                    <span>📊</span> Avancement Chantiers
+                </button>
+                <button onclick="toggleSidebarLeft(); ouvrirScannerQR();" class="w-full text-left px-3 py-2 rounded-lg hover:bg-blue-50 font-semibold text-gray-700 text-sm flex items-center gap-2">
+                    <span>📷</span> Scanner QR Code
+                </button>
+            </div>
+
+            <!-- Liste dynamique des Chantiers -->
+            <div>
+                <h3 class="text-xs font-bold uppercase text-gray-500 mb-2">Chantiers disponibles</h3>
+                <div id="sidebarChantiersList" class="space-y-1">
+                    <p class="text-xs text-gray-400 italic">Aucun chantier chargé</p>
+                </div>
+            </div>
         </div>
-        <div class="p-4 border-t text-center">
-            <button onclick="deconnexion()" class="w-full bg-red-50 hover:bg-red-100 text-red-600 font-bold py-2 px-4 rounded-lg text-sm transition">
+
+        <div class="p-3 border-t text-center">
+            <button onclick="deconnexion()" class="w-full bg-red-50 hover:bg-red-100 text-red-600 font-bold py-2 px-3 rounded-lg text-xs transition">
                 🚪 Changer d'utilisateur
             </button>
+        </div>
+    </div>
+
+    <!-- ================= SIDEBAR DROITE (NUMÉROS DE SUPPORTS) ================= -->
+    <div id="sidebar-right" class="fixed inset-y-0 right-0 w-80 bg-white shadow-2xl z-55 transform translate-x-full sidebar-transition flex flex-col">
+        <div class="p-4 bg-gray-800 text-white flex justify-between items-center">
+            <div>
+                <h2 class="font-bold text-base">Supports du Chantier</h2>
+                <p id="sidebarRightSubTitle" class="text-xs text-gray-300 mt-0.5">Sélectionnez un chantier</p>
+            </div>
+            <button onclick="toggleSidebarRight()" class="text-white hover:bg-gray-700 p-2 rounded-lg text-lg">✕</button>
+        </div>
+        
+        <div class="flex-1 p-4 overflow-y-auto">
+            <h3 class="text-xs font-bold uppercase text-gray-500 mb-2">Liste des supports</h3>
+            <div id="sidebarSupportsList" class="space-y-1">
+                <p class="text-xs text-gray-400 italic">Veuillez d'abord choisir un chantier.</p>
+            </div>
         </div>
     </div>
 
     <!-- CONTENU PRINCIPAL -->
     <div id="main-app" class="max-w-4xl mx-auto bg-white rounded-xl shadow-md p-6 hidden">
         
-        <!-- En-tête avec bouton Menu (Sidebar) -->
+        <!-- En-tête avec les deux boutons de déclenchement des Sidebars -->
         <div class="flex items-center justify-between mb-4 border-b pb-4">
-            <div class="flex items-center gap-3">
-                <button onclick="toggleSidebar()" class="bg-gray-100 hover:bg-gray-200 text-gray-800 p-2.5 rounded-lg shadow-sm transition flex items-center justify-center">
-                    <span class="text-xl">☰</span>
+            <div class="flex items-center gap-2">
+                <!-- Bouton Menu / Chantiers (Gauche) -->
+                <button onclick="toggleSidebarLeft()" class="bg-blue-600 hover:bg-blue-700 text-white p-2.5 rounded-lg shadow-sm transition flex items-center gap-1.5 text-sm font-bold">
+                    <span class="text-lg">☰</span> <span class="hidden sm:inline">Chantiers</span>
                 </button>
-                <h1 class="text-xl font-bold text-gray-800">📋 Suivi des Travaux</h1>
+                <h1 class="text-lg sm:text-xl font-bold text-gray-800">📋 Suivi des Travaux</h1>
             </div>
-            <div id="containerActions" class="hidden flex gap-2">
-                <button id="btnCopier" onclick="copierTravaux()" class="bg-gray-800 hover:bg-gray-900 text-white px-3 py-2 rounded-lg font-bold text-sm shadow transition flex items-center gap-1.5">
-                    <span>📋</span> Copier
+
+            <div class="flex items-center gap-2">
+                <!-- Bouton Liste Supports (Droite) -->
+                <button onclick="toggleSidebarRight()" class="bg-gray-800 hover:bg-gray-900 text-white p-2.5 rounded-lg shadow-sm transition flex items-center gap-1.5 text-sm font-bold">
+                    <span>🗼</span> <span class="hidden sm:inline">Supports</span>
                 </button>
-                <button id="btnSharePDF" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg font-bold text-sm shadow transition flex items-center gap-1.5">
-                    <span>📄</span> Partager PDF
-                </button>
+                
+                <div id="containerActions" class="hidden flex gap-2">
+                    <button id="btnCopier" onclick="copierTravaux()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 py-2 rounded-lg font-bold text-sm shadow transition flex items-center gap-1">
+                        <span>📋</span>
+                    </button>
+                    <button id="btnSharePDF" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg font-bold text-sm shadow transition flex items-center gap-1">
+                        <span>📄</span>
+                    </button>
+                </div>
             </div>
         </div>
             
@@ -106,7 +152,7 @@
                 </div>
             </div>
 
-            <!-- Boutons globaux pour cocher / décocher rapidement toutes les tâches du support -->
+            <!-- Boutons d'actions rapides -->
             <div id="sectionActionsRapides" class="hidden flex gap-2 mb-4">
                 <button onclick="cocherToutSupport(true)" class="bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1">
                     <span>✅</span> Tout cocher sur ce support
@@ -142,9 +188,9 @@
 
     </div>
 
-    <!-- Modale RJ -->
-    <div id="divRJModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white p-6 rounded-xl shadow-lg w-85 max-w-sm text-center">
+    <!-- Modales (RJ, Ajout Tâche, Scanner QR) -->
+    <div id="divRJModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-sm text-center">
             <p class="font-bold text-lg mb-2 text-gray-800">🌙 Numéro RJ requis</p>
             <p class="text-xs text-gray-600 mb-4">Veuillez indiquer le numéro RJ pour valider cette action :</p>
             <input type="text" id="rjInput" placeholder="Numéro RJ" class="w-full p-2 border rounded-lg mb-4 text-center font-bold focus:ring-2 focus:ring-blue-500">
@@ -155,9 +201,8 @@
         </div>
     </div>
 
-    <!-- Modale Ajout Tâche -->
-    <div id="divAjoutTacheModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white p-6 rounded-xl shadow-lg w-90 max-w-sm">
+    <div id="divAjoutTacheModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-sm">
             <p class="font-bold text-lg mb-2 text-gray-800 text-center">➕ Ajouter un travail non prévu</p>
             <p class="text-xs text-gray-600 mb-4 text-center">Ce travail sera enregistré directement dans Supabase.</p>
             <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Intitulé de la tâche :</label>
@@ -169,7 +214,6 @@
         </div>
     </div>
 
-    <!-- Modale Scanner QR Code -->
     <div id="divQRModal" class="hidden fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
         <div class="bg-white p-6 rounded-xl shadow-xl w-full max-w-md text-center">
             <h3 class="text-lg font-bold text-gray-800 mb-2">📷 Scanner un QR Code</h3>
@@ -208,11 +252,51 @@
             }
         });
 
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
+        /* ================= GESTION DES DEUX SIDEBARS ================= */
+        function toggleSidebarLeft() {
+            const sbLeft = document.getElementById('sidebar-left');
+            const sbRight = document.getElementById('sidebar-right');
             const overlay = document.getElementById('sidebar-overlay');
-            sidebar.classList.toggle('-translate-x-full');
-            overlay.classList.toggle('hidden');
+            
+            // Fermer l'autre si ouverte
+            if (!sbRight.classList.contains('translate-x-full')) {
+                sbRight.classList.add('translate-x-full');
+            }
+
+            sbLeft.classList.toggle('-translate-x-full');
+            const isClosed = sbLeft.classList.contains('-translate-x-full');
+            
+            if (isClosed && sbRight.classList.contains('translate-x-full')) {
+                overlay.classList.add('hidden');
+            } else {
+                overlay.classList.remove('hidden');
+            }
+        }
+
+        function toggleSidebarRight() {
+            const sbRight = document.getElementById('sidebar-right');
+            const sbLeft = document.getElementById('sidebar-left');
+            const overlay = document.getElementById('sidebar-overlay');
+
+            // Fermer l'autre si ouverte
+            if (!sbLeft.classList.contains('-translate-x-full')) {
+                sbLeft.classList.add('-translate-x-full');
+            }
+
+            sbRight.classList.toggle('translate-x-full');
+            const isClosed = sbRight.classList.contains('translate-x-full');
+
+            if (isClosed && sbLeft.classList.contains('-translate-x-full')) {
+                overlay.classList.add('hidden');
+            } else {
+                overlay.classList.remove('hidden');
+            }
+        }
+
+        function fermerToutesSidebars() {
+            document.getElementById('sidebar-left').classList.add('-translate-x-full');
+            document.getElementById('sidebar-right').classList.add('translate-x-full');
+            document.getElementById('sidebar-overlay').classList.add('hidden');
         }
 
         function deconnexion() {
@@ -295,11 +379,6 @@
                     localStorage.clear();
                     document.getElementById('auth-overlay').classList.remove('hidden');
                     document.getElementById('main-app').classList.add('hidden');
-                    if (userRecord && userRecord.sutx !== true) {
-                        const errorEl = document.getElementById('auth-error');
-                        errorEl.textContent = "❌ Votre accès SUTX a été désactivé.";
-                        errorEl.classList.remove('hidden');
-                    }
                     return;
                 }
 
@@ -336,64 +415,35 @@
 
                 rawData = (data || []).map(r => ({ ...r, modifie: false, isCustom: false }));
                 
-                const chantiers = [...new Set(rawData.map(r => r.Chantier))].filter(Boolean);
-                const selectChantier = document.getElementById('selectChantier');
-                selectChantier.innerHTML = '<option value="">Choisir...</option>';
-                chantiers.forEach(c => selectChantier.add(new Option(c, c)));
+                peuplerSelectChantiersEt SidebarGauche();
             } catch (err) {
                 console.error("Erreur de chargement des tâches :", err);
                 alert("Erreur lors du chargement des données de chantier.");
             }
         }
 
-        function changerOnglet(numPage) {
-            if (numPage === 2 && !userAdmin) {
-                alert("Accès réservé aux administrateurs.");
-                return;
-            }
-
-            const page1 = document.getElementById('page1');
-            const page2 = document.getElementById('page2');
-
-            if (numPage === 1) {
-                page1.classList.remove('hidden');
-                page2.classList.add('hidden');
-            } else {
-                page1.classList.add('hidden');
-                page2.classList.remove('hidden');
-                calculerEtAfficherAvancement();
-            }
-        }
-
-        function calculerEtAfficherAvancement() {
-            const conteneur = document.getElementById('conteneurAvancement');
-            conteneur.innerHTML = '';
-
+        function peuplerSelectChantiersEtSidebarGauche() {
             const chantiers = [...new Set(rawData.map(r => r.Chantier))].filter(Boolean);
+            const selectChantier = document.getElementById('selectChantier');
+            const sidebarChantiersList = document.getElementById('sidebarChantiersList');
 
-            if (chantiers.length === 0) {
-                conteneur.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">Aucune donnée disponible.</p>';
-                return;
-            }
+            selectChantier.innerHTML = '<option value="">Choisir...</option>';
+            sidebarChantiersList.innerHTML = '';
 
-            chantiers.forEach(chantier => {
-                const lignesChantier = rawData.filter(r => r.Chantier === chantier);
-                const totalTaches = lignesChantier.length;
-                const tachesFaites = lignesChantier.filter(r => ['vrai', 'true', '1'].includes(String(r.Fait).toLowerCase().trim())).length;
-                const pourcentage = totalTaches > 0 ? Math.round((tachesFaites / totalTaches) * 100) : 0;
+            chantiers.forEach(c => {
+                // Remplir le select principal
+                selectChantier.add(new Option(c, c));
 
-                const divChantier = document.createElement('div');
-                divChantier.className = "bg-gray-50 p-4 border rounded-lg shadow-sm";
-                divChantier.innerHTML = `
-                    <div class="flex justify-between items-center mb-2">
-                        <span class="font-bold text-gray-800">${chantier}</span>
-                        <span class="text-sm font-semibold text-blue-600">${tachesFaites} / ${totalTaches} (${pourcentage}%)</span>
-                    </div>
-                    <div class="w-full bg-gray-200 rounded-full h-3">
-                        <div class="bg-blue-600 h-3 rounded-full transition-all duration-500" style="width: ${pourcentage}%"></div>
-                    </div>
-                `;
-                conteneur.appendChild(divChantier);
+                // Remplir la sidebar gauche des chantiers
+                const btn = document.createElement('button');
+                btn.className = "w-full text-left px-3 py-2 rounded-lg hover:bg-blue-50 text-gray-800 text-xs font-semibold truncate transition flex items-center justify-between";
+                btn.innerHTML = `<span>🏗️ ${c}</span> <span class="text-gray-400">›</span>`;
+                btn.onclick = () => {
+                    fermerToutesSidebars();
+                    selectChantier.value = c;
+                    gererChangementChantier();
+                };
+                sidebarChantiersList.appendChild(btn);
             });
         }
 
@@ -405,19 +455,48 @@
         const containerActions = document.getElementById('containerActions');
 
         selectChantier.addEventListener('change', () => {
+            gererChangementChantier();
+        });
+
+        function gererChangementChantier() {
+            const chantierChoisi = selectChantier.value;
             selectSupport.innerHTML = '<option value="">Choisir...</option>';
             sectionTachesSupport.classList.add('hidden');
             sectionActionsRapides.classList.add('hidden');
             containerTaches.innerHTML = '';
-            const chantierChoisi = selectChantier.value;
+            containerActions.classList.add('hidden');
+
+            const sidebarSupportsList = document.getElementById('sidebarSupportsList');
+            const sidebarRightSubTitle = document.getElementById('sidebarRightSubTitle');
+
             if (!chantierChoisi) {
                 selectSupport.disabled = true;
+                sidebarSupportsList.innerHTML = '<p class="text-xs text-gray-400 italic">Veuillez d\'abord choisir un chantier.</p>';
+                sidebarRightSubTitle.textContent = "Sélectionnez un chantier";
                 return;
             }
+
             const supports = [...new Set(rawData.filter(r => r.Chantier === chantierChoisi).map(r => r.Support))].filter(Boolean);
+            
             supports.forEach(s => selectSupport.add(new Option(s, s)));
             selectSupport.disabled = false;
-        });
+
+            // Mettre à jour la sidebar de droite avec les numéros de supports
+            sidebarRightSubTitle.textContent = chantierChoisi;
+            sidebarSupportsList.innerHTML = '';
+
+            supports.forEach(s => {
+                const btnSup = document.createElement('button');
+                btnSup.className = "w-full text-left px-3 py-2 rounded-lg hover:bg-gray-100 text-gray-800 text-xs font-bold transition flex items-center justify-between border-b border-gray-100";
+                btnSup.innerHTML = `<span>🗼 Support ${s}</span> <span class="text-gray-400">›</span>`;
+                btnSup.onclick = () => {
+                    fermerToutesSidebars();
+                    selectSupport.value = s;
+                    rafraichirAffichageTaches();
+                };
+                sidebarSupportsList.appendChild(btnSup);
+            });
+        }
 
         selectSupport.addEventListener('change', () => {
             rafraichirAffichageTaches();
@@ -480,12 +559,11 @@
                                 .update({ Fait: etatVoulu })
                                 .eq('id', rawData[i].id);
                         } catch (err) {
-                            console.error(`Erreur mise à jour ID ${rawData[i].id}:`, err);
+                            console.error(`Erreur ID ${rawData[i].id}:`, err);
                         }
                     }
                 }
             }
-
             rafraichirAffichageTaches();
         }
 
@@ -499,16 +577,9 @@
             try {
                 const updateData = {};
                 updateData[champ] = valeur;
-
-                const { error } = await supabaseClient
-                    .from('suivi_tx_cat')
-                    .update(updateData)
-                    .eq('id', ligne.id);
-
-                if (error) throw error;
+                await supabaseClient.from('suivi_tx_cat').update(updateData).eq('id', ligne.id);
             } catch (err) {
-                console.error("Erreur de mise à jour Supabase :", err);
-                alert("❌ Erreur lors de l'enregistrement en base de données.");
+                console.error("Erreur mise à jour :", err);
             }
         }
 
@@ -522,10 +593,7 @@
             const chantierChoisi = selectChantier.value;
             const supportChoisi = selectSupport.value;
 
-            if (!intitule) {
-                alert("Veuillez saisir un intitulé pour ce travail.");
-                return;
-            }
+            if (!intitule) return;
 
             try {
                 const nouvelleLigne = {
@@ -533,14 +601,10 @@
                     Support: supportChoisi,
                     Tache: intitule,
                     Fait: true,
-                    Observation: "Travail non prévu ajouté manuellement"
+                    Observation: "Travail ajouté manuellement"
                 };
 
-                const { data, error } = await supabaseClient
-                    .from('suivi_tx_cat')
-                    .insert([nouvelleLigne])
-                    .select();
-
+                const { data, error } = await supabaseClient.from('suivi_tx_cat').insert([nouvelleLigne]).select();
                 if (error) throw error;
 
                 if (data && data.length > 0) {
@@ -550,8 +614,7 @@
                 document.getElementById('divAjoutTacheModal').classList.add('hidden');
                 rafraichirAffichageTaches();
             } catch (err) {
-                console.error("Erreur d'insertion :", err);
-                alert("❌ Erreur lors de l'ajout de la tâche.");
+                console.error("Erreur insertion :", err);
             }
         }
 
@@ -560,17 +623,32 @@
         });
 
         function copierTravaux() {
-            copierDansPressePapier();
-        }
-
-        function verifierModificationsEtDemanderRJ(typeAction) {
-            const elementsModifies = rawData.filter(r => r.modifie === true);
-
-            if (elementsModifies.length === 0) {
-                alert("Aucune modification n'a été effectuée pendant cette session.");
+            const elementsFaites = rawData.filter(r => r.modifie === true && ['vrai', 'true', '1'].includes(String(r.Fait).toLowerCase().trim()));
+            if (elementsFaites.length === 0) {
+                alert("Aucun travail validé trouvé.");
                 return;
             }
 
+            let texteFinal = "";
+            const supportsGrouper = {};
+            elementsFaites.forEach(r => {
+                if (!supportsGrouper[r.Support]) supportsGrouper[r.Support] = [];
+                supportsGrouper[r.Support].push(r.Tache);
+            });
+
+            for (const [sup, taches] of Object.entries(supportsGrouper)) {
+                texteFinal += `Support ${sup}:\n` + taches.map(t => `- ${t}`).join('\n') + `\n\n`;
+            }
+
+            navigator.clipboard.writeText(texteFinal.trim()).then(() => alert("✅ Copié !"));
+        }
+
+        function verifierModificationsEtDemanderRJ(typeAction) {
+            const mods = rawData.filter(r => r.modifie === true);
+            if (mods.length === 0) {
+                alert("Aucune modification récente.");
+                return;
+            }
             actionEnCours = typeAction;
             document.getElementById('rjInput').value = sessionRJ || "";
             document.getElementById('divRJModal').classList.remove('hidden');
@@ -578,67 +656,18 @@
 
         function executerActionEnAttente() {
             const saisiRJ = document.getElementById('rjInput').value.trim();
-            if (!saisiRJ) {
-                alert("Veuillez entrer un numéro RJ valide.");
-                return;
-            }
+            if (!saisiRJ) return;
             sessionRJ = saisiRJ;
             document.getElementById('divRJModal').classList.add('hidden');
             document.getElementById('headerInfo').innerText = `👤 SUTX : ${userPrenom} ${userName} | 📌 RJ : ${sessionRJ}`;
-
-            if (actionEnCours === 'pdf') {
-                genererEtPartagerPDF();
-            }
-        }
-
-        async function copierDansPressePapier() {
-            const elementsFaites = rawData.filter(r => r.modifie === true && ['vrai', 'true', '1'].includes(String(r.Fait).toLowerCase().trim()));
-
-            if (elementsFaites.length === 0) {
-                alert("Aucun travail validé (coché fait) n'a été trouvé pour la copie.");
-                return;
-            }
-
-            const supportsGrouper = {};
-            elementsFaites.forEach(r => {
-                const support = r.Support || "Support inconnu";
-                if (!supportsGrouper[support]) {
-                    supportsGrouper[support] = [];
-                }
-                supportsGrouper[support].push({
-                    tache: r.Tache,
-                    observation: r.Observation ? r.Observation.trim() : ""
-                });
-            });
-
-            let texteFinal = "";
-            for (const [support, items] of Object.entries(supportsGrouper)) {
-                texteFinal += `Support : ${support}\n`;
-                items.forEach(item => {
-                    if (item.observation) {
-                        texteFinal += `- ${item.tache} (Obs: ${item.observation})\n`;
-                    } else {
-                        texteFinal += `- ${item.tache}\n`;
-                    }
-                });
-                texteFinal += `\n`;
-            }
-
-            try {
-                await navigator.clipboard.writeText(texteFinal.trim());
-                alert("✅ Récapitulatif copié dans le presse-papiers !");
-            } catch (err) {
-                console.error("Erreur de copie : ", err);
-                alert("Erreur lors de la copie automatique.");
-            }
+            if (actionEnCours === 'pdf') genererEtPartagerPDF();
         }
 
         async function genererEtPartagerPDF() {
             const elementsModifies = rawData.filter(r => r.modifie === true);
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
-            const dateEnvoi = new Date().toLocaleString();
-
+            
             doc.setFillColor(37, 99, 235);
             doc.rect(0, 0, 210, 25, 'F');
             doc.setTextColor(255, 255, 255);
@@ -647,47 +676,31 @@
 
             doc.setTextColor(50, 50, 50);
             doc.setFontSize(11);
-            doc.text(`Opérateur SUTX : ${userPrenom} ${userName}`, 14, 35);
-            doc.text(`Numéro RJ : ${sessionRJ}`, 14, 42);
-            doc.text(`Date d'envoi : ${dateEnvoi}`, 14, 49);
+            doc.text(`Opérateur : ${userPrenom} ${userName} - RJ : ${sessionRJ}`, 14, 35);
 
-            const tableColumns = ["ID", "Chantier", "Support", "Tache", "Fait", "Observation"];
-            const tableRows = elementsModifies.map(r => [
-                r.id || "SANS ID", r.Chantier, r.Support, r.Tache, r.Fait ? "Oui" : "Non", r.Observation
-            ]);
-
+            const tableRows = elementsModifies.map(r => [r.Chantier, r.Support, r.Tache, r.Fait ? "Oui" : "Non", r.Observation]);
             doc.autoTable({
-                startY: 55,
-                head: [tableColumns],
+                startY: 45,
+                head: [["Chantier", "Support", "Tâche", "Fait", "Observation"]],
                 body: tableRows,
                 theme: 'grid',
-                headStyles: { fillColor: [37, 99, 235], textColor: [255, 255, 255] },
-                styles: { fontSize: 9, cellPadding: 3 }
+                headStyles: { fillColor: [37, 99, 235] }
             });
 
             const pdfOutput = doc.output('blob');
-            const fileName = `Suivi_Modifications_RJ_${sessionRJ}.pdf`;
-            const file = new File([pdfOutput], fileName, { type: "application/pdf" });
+            const file = new File([pdfOutput], `Suivi_RJ_${sessionRJ}.pdf`, { type: "application/pdf" });
 
             try {
                 if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                    await navigator.share({
-                        files: [file],
-                        title: 'Rapport Suivi Travaux',
-                        text: `Bonjour, voici le rapport de suivi des travaux pour le RJ ${sessionRJ}.\nOpérateur : ${userPrenom} ${userName}`
-                    });
+                    await navigator.share({ files: [file], title: 'Rapport SUTX', text: `Rapport RJ ${sessionRJ}` });
                     return;
                 }
-            } catch (err) {
-                if (err.name === 'AbortError') return;
-            }
-
-            doc.save(fileName);
+            } catch (err) {}
+            doc.save(`Suivi_RJ_${sessionRJ}.pdf`);
         }
 
         async function partagerPDFAvancement() {
             if (!userAdmin) return;
-
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
             const chantiers = [...new Set(rawData.map(r => r.Chantier))].filter(Boolean);
@@ -695,104 +708,99 @@
             doc.setFillColor(37, 99, 235);
             doc.rect(0, 0, 210, 25, 'F');
             doc.setTextColor(255, 255, 255);
-            doc.setFontSize(16);
-            doc.text("BILAN D'AVANCEMENT DES CHANTIERS", 14, 16);
+            doc.text("BILAN D'AVANCEMENT", 14, 16);
 
-            doc.setTextColor(50, 50, 50);
-            doc.setFontSize(11);
-            doc.text(`Opérateur : ${userPrenom} ${userName}`, 14, 35);
-
-            const tableColumns = ["Chantier", "Tâches Réalisées", "Total Tâches", "Avancement"];
-            const tableRows = chantiers.map(chantier => {
-                const lignes = rawData.filter(r => r.Chantier === chantier);
-                const total = lignes.length;
+            const tableRows = chantiers.map(c => {
+                const lignes = rawData.filter(r => r.Chantier === c);
                 const faites = lignes.filter(r => ['vrai', 'true', '1'].includes(String(r.Fait).toLowerCase().trim())).length;
-                const pct = total > 0 ? Math.round((faites / total) * 100) : 0;
-                return [chantier, faites, total, `${pct}%`];
+                const pct = lignes.length > 0 ? Math.round((faites / lignes.length) * 100) : 0;
+                return [c, faites, lignes.length, `${pct}%`];
             });
 
             doc.autoTable({
-                startY: 45,
-                head: [tableColumns],
+                startY: 35,
+                head: [["Chantier", "Faites", "Total", "Avancement"]],
                 body: tableRows,
-                theme: 'grid',
-                headStyles: { fillColor: [37, 99, 235], textColor: [255, 255, 255] },
-                styles: { fontSize: 10, cellPadding: 4 }
+                theme: 'grid'
             });
 
             const pdfOutput = doc.output('blob');
-            const fileName = `Avancement_Chantiers.pdf`;
-            const file = new File([pdfOutput], fileName, { type: "application/pdf" });
-
+            const file = new File([pdfOutput], `Avancement_Chantiers.pdf`, { type: "application/pdf" });
             try {
                 if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                    await navigator.share({
-                        files: [file],
-                        title: 'Avancement Chantiers',
-                        text: `Bonjour, voici le bilan d'avancement global des chantiers.\nOpérateur : ${userPrenom} ${userName}`
-                    });
+                    await navigator.share({ files: [file], title: 'Avancement', text: 'Bilan avancement' });
                     return;
                 }
-            } catch (err) {
-                if (err.name === 'AbortError') return;
-            }
-
-            doc.save(fileName);
+            } catch (err) {}
+            doc.save(`Avancement_Chantiers.pdf`);
         }
 
-        /* ================= GESTION DU SCANNER QR CODE ================= */
+        function changerOnglet(numPage) {
+            if (numPage === 2 && !userAdmin) return;
+            const page1 = document.getElementById('page1');
+            const page2 = document.getElementById('page2');
+            if (numPage === 1) {
+                page1.classList.remove('hidden');
+                page2.classList.add('hidden');
+            } else {
+                page1.classList.add('hidden');
+                page2.classList.remove('hidden');
+                calculerEtAfficherAvancement();
+            }
+        }
+
+        function calculerEtAfficherAvancement() {
+            const conteneur = document.getElementById('conteneurAvancement');
+            conteneur.innerHTML = '';
+            const chantiers = [...new Set(rawData.map(r => r.Chantier))].filter(Boolean);
+            chantiers.forEach(chantier => {
+                const lignes = rawData.filter(r => r.Chantier === chantier);
+                const faites = lignes.filter(r => ['vrai', 'true', '1'].includes(String(r.Fait).toLowerCase().trim())).length;
+                const pct = lignes.length > 0 ? Math.round((faites / lignes.length) * 100) : 0;
+                const div = document.createElement('div');
+                div.className = "bg-gray-50 p-4 border rounded-lg shadow-sm";
+                div.innerHTML = `
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="font-bold text-gray-800">${chantier}</span>
+                        <span class="text-sm font-semibold text-blue-600">${faites} / ${lignes.length} (${pct}%)</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-3">
+                        <div class="bg-blue-600 h-3 rounded-full transition-all" style="width: ${pct}%"></div>
+                    </div>
+                `;
+                conteneur.appendChild(div);
+            });
+        }
+
         function ouvrirScannerQR() {
             document.getElementById('divQRModal').classList.remove('hidden');
-            if (!html5QrCode) {
-                html5QrCode = new Html5Qrcode("reader");
-            }
+            if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
             html5QrCode.start(
                 { facingMode: "environment" },
                 { fps: 10, qrbox: { width: 250, height: 250 } },
-                (decodedText) => {
-                    traiterCodeQRScanne(decodedText.trim());
-                    fermerScannerQR();
-                },
-                (errorMessage) => {
-                    // Erreurs de scan en direct ignorées
-                }
-            ).catch(err => {
-                console.error("Erreur caméra QR :", err);
-                alert("Impossible d'accéder à la caméra pour le scan.");
-                fermerScannerQR();
-            });
+                (text) => { traiterCodeQRScanne(text.trim()); fermerScannerQR(); },
+                (err) => {}
+            ).catch(e => { alert("Caméra inaccessible."); fermerScannerQR(); });
         }
 
         function fermerScannerQR() {
             if (html5QrCode && html5QrCode.isScanning) {
-                html5QrCode.stop().then(() => {
-                    document.getElementById('divQRModal').classList.add('hidden');
-                }).catch(err => {
-                    console.error("Erreur arrêt scan :", err);
-                    document.getElementById('divQRModal').classList.add('hidden');
-                });
+                html5QrCode.stop().then(() => document.getElementById('divQRModal').classList.add('hidden')).catch(() => document.getElementById('divQRModal').classList.add('hidden'));
             } else {
                 document.getElementById('divQRModal').classList.add('hidden');
             }
         }
 
-        function traiterCodeQRScanne(codeTexte) {
-            // Recherche si le texte scanné correspond à un support existant
-            const matchSupport = rawData.find(r => String(r.Support).toLowerCase() === codeTexte.toLowerCase());
-            
-            if (matchSupport) {
-                selectChantier.value = matchSupport.Chantier;
-                // Déclencher le changement pour peupler les supports
-                const supports = [...new Set(rawData.filter(r => r.Chantier === matchSupport.Chantier).map(r => r.Support))].filter(Boolean);
-                selectSupport.innerHTML = '<option value="">Choisir...</option>';
-                supports.forEach(s => selectSupport.add(new Option(s, s)));
-                selectSupport.disabled = false;
-                
-                selectSupport.value = matchSupport.Support;
+        function traiterCodeQRScanne(code) {
+            const match = rawData.find(r => String(r.Support).toLowerCase() === code.toLowerCase());
+            if (match) {
+                selectChantier.value = match.Chantier;
+                gererChangementChantier();
+                selectSupport.value = match.Support;
                 rafraichirAffichageTaches();
-                alert(`✅ Support "${matchSupport.Support}" sélectionné avec succès !`);
+                alert(`✅ Support "${match.Support}" sélectionné !`);
             } else {
-                alert(`ℹ️ QR Code scanné : "${codeTexte}" (Aucun support correspondant exact trouvé dans les données chargées).`);
+                alert(`ℹ️ Scanné : "${code}" (Non trouvé dans les données).`);
             }
         }
     </script>
