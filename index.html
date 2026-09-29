@@ -17,27 +17,28 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     <!-- SDK Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
     <style>
         /* Fond assombri derrière les sidebars */
         .sidebar-backdrop { display:none; position:fixed; top:0; left:0; width:100%; height:100%;
             background-color:rgba(0,0,0,0.4); z-index:999; }
         .sidebar-backdrop.active { display:block; }
 
-        /* Sidebar GAUCHE (menu / chantiers) */
+        /* Sidebar GAUCHE (menu / chantiers) - Largeur réduite pour meilleur visibilité (300px max, responsive) */
         .sidebar { height:100%; width:0; position:fixed; z-index:1000; top:0; left:0; background-color:#111;
-            overflow-x:hidden; overflow-y:auto; transition:0.3s; padding-top:60px; padding-bottom:170px;
-            box-shadow:2px 0 5px rgba(0,0,0,0.5); }
-        .sidebar button.sidebar-action-btn { padding:12px 20px; font-size:18px; color:#818181; display:block;
+            overflow-x:hidden; overflow-y:auto; transition:0.3s; padding-top:60px; padding-bottom:120px;
+            box-shadow:2px 0 5px rgba(0,0,0,0.5); max-width: 85vw; width: 0; }
+        .sidebar.open { width: 300px; }
+        .sidebar button.sidebar-action-btn { padding:12px 20px; font-size:16px; color:#818181; display:block;
             background:none; border:none; width:100%; text-align:left; cursor:pointer; transition:0.2s; }
         .sidebar button.sidebar-action-btn:hover { color:#f1f1f1; background-color:#222; }
         .sidebar .btn-fermer { position:absolute; top:15px; right:20px; font-size:30px; width:auto;
             color:#818181; background:none; border:none; cursor:pointer; }
 
-        /* Sidebar DROITE (supports) */
+        /* Sidebar DROITE (supports) - Largeur réduite pour meilleur visibilité (300px max, responsive) */
         .sidebar-right { height:100%; width:0; position:fixed; z-index:1000; top:0; right:0; background-color:#111;
             overflow-x:hidden; overflow-y:auto; transition:0.3s; padding-top:60px; padding-bottom:120px;
-            box-shadow:-2px 0 5px rgba(0,0,0,0.5); }
+            box-shadow:-2px 0 5px rgba(0,0,0,0.5); max-width: 85vw; width: 0; }
+        .sidebar-right.open { width: 300px; }
         .sidebar-right .btn-fermer-droit { position:absolute; top:15px; left:20px; font-size:30px; width:auto;
             color:#818181; background:none; border:none; cursor:pointer; }
 
@@ -46,8 +47,11 @@
             box-sizing:border-box; border-top:1px solid #333; transition:width 0.3s; z-index:1001; }
         #footerGauche { left:0; }
         #footerDroit { right:0; }
+        .sidebar.open ~ #footerGauche, .sidebar[style*="width: 300"] ~ #footerGauche, #footerGauche.open { width: 300px; }
+        .sidebar-right.open ~ #footerDroit, #footerDroit.open { width: 300px; }
+        
         .sidebar-fixed-footer button { display:block; width:100%; background-color:#2563eb; color:#fff; border:none;
-            padding:12px 15px; font-size:16px; font-weight:bold; cursor:pointer; transition:background-color 0.2s;
+            padding:12px 15px; font-size:15px; font-weight:bold; cursor:pointer; transition:background-color 0.2s;
             white-space:nowrap; }
         .sidebar-fixed-footer button + button { border-top:1px solid #1d4ed8; }
         .sidebar-fixed-footer button:hover { background-color:#1d4ed8; }
@@ -62,18 +66,22 @@
     <div id="menuParametres" class="sidebar">
         <button class="btn-fermer" onclick="basculerMenuParametres()">&times;</button>
 
-        <button id="btnSidebarAdmin" class="sidebar-action-btn" style="display:none;" onclick="ouvrirOngletAdminDepuisMenu()">📊 Avancement (Admin)</button>
+        <!-- Boutons Saisie / Admin intégrés tout en haut sous la fermeture -->
+        <div style="padding: 10px 20px 15px 20px; display: flex; gap: 8px; border-bottom: 1px solid #222; margin-bottom: 10px;">
+            <button id="btnMenuSaisie" onclick="changerOnglet(1); fermerToutesSidebars();" style="flex: 1; padding: 10px; font-size: 13px; font-weight: bold; background: #2563eb; color: #fff; border: none; border-radius: 6px; cursor: pointer; transition: 0.2s;">Saisie</button>
+            <button id="btnMenuAdmin" onclick="changerOnglet(2); fermerToutesSidebars();" style="flex: 1; padding: 10px; font-size: 13px; font-weight: bold; background: #333; color: #aaa; border: none; border-radius: 6px; cursor: pointer; display: none; transition: 0.2s;">Admin</button>
+        </div>
+
         <button class="sidebar-action-btn" onclick="ouvrirFBMDepuisMenu()">🚧 Ouvrir FBM</button>
 
         <div style="padding: 15px 20px;">
-            <label style="color: #aaa; font-size: 14px; display: block; margin-bottom: 8px; font-weight: bold;">🏗️ Choisir un chantier :</label>
+            <label style="color: #aaa; font-size: 13px; display: block; margin-bottom: 8px; font-weight: bold;">🏗️ Choisir un chantier :</label>
             <div id="sidebarChantiersContainer" style="display: flex; flex-direction: column; gap: 6px;"></div>
         </div>
 
         <div id="footerGauche" class="sidebar-fixed-footer">
             <button onclick="actionCopierDepuisMenu()">📋 Copier</button>
             <button onclick="actionPartagerPDFDepuisMenu()">📄 Partager PDF</button>
-            <button id="btn-qr-code" onclick="scannerQRCode()">📷 QR-CODE</button>
         </div>
     </div>
 
@@ -83,7 +91,7 @@
         <div style="padding: 15px 20px;">
             <h3 style="color: #fff; margin-top: 0; font-size: 1.1em; border-bottom: 1px solid #333; padding-bottom: 8px;">📍 Liste des Supports</h3>
             <div style="margin-bottom: 12px;">
-                <input type="text" id="filtreSupportInput" placeholder="Rechercher un support..." oninput="filtrerListeSupportsDroite()" style="width: 100%; padding: 8px; box-sizing: border-box; border-radius: 4px; border: 1px solid #444; background: #222; color: #fff;">
+                <input type="text" id="filtreSupportInput" placeholder="Rechercher un support..." oninput="filtrerListeSupportsDroite()" style="width: 100%; padding: 8px; box-sizing: border-box; border-radius: 4px; border: 1px solid #444; background: #222; color: #fff; font-size: 13px;">
             </div>
             <div id="sidebarSupportsContainer" style="display: flex; flex-direction: column; gap: 6px;"></div>
         </div>
@@ -109,15 +117,11 @@
     <!-- CONTENU PRINCIPAL -->
     <div id="main-app" class="max-w-4xl mx-auto bg-white rounded-xl shadow-md p-6 hidden">
         
-        <!-- Barre des onglets de navigation -->
-        <div class="flex gap-2 mb-6 border-b pb-4">
-            <button type="button" onclick="basculerMenuParametres()" title="Ouvrir le menu" class="px-3 py-2 rounded-lg font-bold text-lg bg-gray-800 hover:bg-gray-900 text-white shadow transition">☰</button>
-            <button id="tabPage1" onclick="changerOnglet(1)" class="flex-1 py-2 px-4 rounded-lg font-bold text-sm bg-blue-600 text-white shadow transition">
-                📋 Saisie & Suivi
-            </button>
-            <button id="tabPage2" onclick="changerOnglet(2)" class="flex-1 py-2 px-4 rounded-lg font-bold text-sm bg-gray-200 text-gray-700 hover:bg-gray-300 transition hidden">
-                📊 Avancement Chantiers
-            </button>
+        <!-- Barre supérieure simplifiée (Bouton hamburger supprimé, seul le titre / bouton menu latéral par les sélecteurs reste) -->
+        <div class="flex items-center justify-between mb-6 border-b pb-4">
+            <div class="flex items-center gap-3">
+                <h1 id="titrePageCourante" class="text-xl font-bold text-gray-800">📋 Saisie & Suivi</h1>
+            </div>
         </div>
 
         <!-- ================= PAGE 1 : SAISIE ================= -->
@@ -159,13 +163,13 @@
 
             <!-- Lien vers l'app FBM (visible quand un support est choisi) -->
             <div id="sectionLienFBM" class="hidden mb-4">
-                <button onclick="ouvrirFBM()" class="w-full bg-orange-500 hover:bg-orange-600 text-white px-3 py-2.5 rounded-lg text-sm font-bold shadow transition flex items-center justify-center gap-2">
-                    <span>🚧</span> Ouvrir la fiche FBM (fouille / blindage)
+                <button onclick="ouvrirFBM()" class="w-full bg-orange-500 hover:bg-orange-600 text-white p-3 rounded-lg font-bold text-sm shadow transition flex items-center justify-center gap-2">
+                    <span>🚧</span> Ouvrir FBM pour ce support
                 </button>
             </div>
 
             <!-- Boutons globaux pour cocher / décocher rapidement toutes les tâches du support -->
-            <div id="sectionActionsRapides" class="hidden flex gap-2 mb-4">
+            <div id="sectionActionsRapides" class="hidden flex flex-wrap gap-2 mb-4">
                 <button onclick="cocherToutSupport(true)" class="bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1">
                     <span>✅</span> Tout cocher sur ce support
                 </button>
@@ -200,32 +204,22 @@
 
     </div>
 
-    <!-- Modale Scan QR -->
-    <div id="divScanModal" class="hidden fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center" style="z-index:1100;">
-        <div style="background:#000; width:90%; max-width:360px; border-radius:12px; overflow:hidden; position:relative;">
-            <video id="scanVideo" style="width:100%; display:block;" autoplay playsinline muted></video>
-            <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:200px; height:200px; border:3px solid #2563eb; border-radius:10px; box-shadow:0 0 0 9999px rgba(0,0,0,0.45);"></div>
-            <p style="color:white; text-align:center; font-size:0.8em; margin:8px 0; position:relative; z-index:2;">Cadre le QR code dans le carré</p>
-            <button onclick="arreterScan()" style="width:100%; background:#dc2626; color:white; padding:10px; margin:0; font-weight:bold; border:none;">❌ Annuler</button>
-        </div>
-    </div>
-
     <!-- Modale RJ -->
-    <div id="divRJModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white p-6 rounded-xl shadow-lg w-85 max-w-sm text-center">
+    <div id="divRJModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-sm text-center">
             <p class="font-bold text-lg mb-2 text-gray-800">🌙 Numéro RJ requis</p>
             <p class="text-xs text-gray-600 mb-4">Veuillez indiquer le numéro RJ pour valider cette action :</p>
             <input type="text" id="rjInput" placeholder="Numéro RJ" class="w-full p-2 border rounded-lg mb-4 text-center font-bold focus:ring-2 focus:ring-blue-500">
             <div class="flex gap-2">
                 <button onclick="executerActionEnAttente()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-lg font-bold text-sm">✅ Valider</button>
-                <button onclick="document.getElementById('divRJModal').classList.add('hidden')" class="flex1 bg-gray-200 hover:bg-gray-300 text-gray-800 p-2 rounded-lg font-bold text-sm">❌ Annuler</button>
+                <button onclick="document.getElementById('divRJModal').classList.add('hidden')" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 p-2 rounded-lg font-bold text-sm">❌ Annuler</button>
             </div>
         </div>
     </div>
 
     <!-- Modale Ajout Tâche -->
-    <div id="divAjoutTacheModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white p-6 rounded-xl shadow-lg w-90 max-w-sm">
+    <div id="divAjoutTacheModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-sm">
             <p class="font-bold text-lg mb-2 text-gray-800 text-center">➕ Ajouter un travail non prévu</p>
             <p class="text-xs text-gray-600 mb-4 text-center">Ce travail sera enregistré directement dans Supabase.</p>
             <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Intitulé de la tâche :</label>
@@ -238,9 +232,9 @@
     </div>
 
     <script>
-        /* ================= CONFIGURATION SUPABASE ================= */
-const SUPABASE_URL = "https://thbqkeugjvsxbryfnzuo.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
+        /* ================= CONFIGURATION SUPABASE ================= -->
+        const SUPABASE_URL = "https://thbqkeugjvsxbryfnzuo.supabase.co";
+        const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
 
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -252,61 +246,12 @@ const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
         let userAdmin = false;
         let actionEnCours = null;
 
-        /* ================= LIEN QR / JUMELAGE FBM ================= */
-        // ⚠️ À ADAPTER : adresse exacte de l'app FBM (avec le / final)
-        const URL_FBM = "https://TON-COMPTE.github.io/DEPOT-FBM/";
-
-        // Paramètres lus dans le lien du QR (?chantier=...&support=...), gardés jusqu'à la fin du chargement
-        const paramsLien = new URLSearchParams(location.search);
-        let qrChantier = paramsLien.get('chantier') || "";
-        let qrSupport = paramsLien.get('support') || "";
-
-        function appliquerParamsQR() {
-            if (!qrChantier) return;
-            const norm = t => (t || '').toString().trim().toLowerCase();
-            const trouver = (sel, val) => Array.from(sel.options).find(o =>
-                o.value && (norm(o.value) === norm(val) || norm(o.text) === norm(val)));
-
-            const optC = trouver(selectChantier, qrChantier);
-            if (!optC) {
-                alert("Chantier « " + qrChantier + " » introuvable dans SUTX.");
-            } else {
-                selectChantier.value = optC.value;
-                selectChantier.dispatchEvent(new Event('change'));
-                if (qrSupport) {
-                    const optS = trouver(selectSupport, qrSupport);
-                    if (optS) {
-                        selectSupport.value = optS.value;
-                        selectSupport.dispatchEvent(new Event('change'));
-                    } else {
-                        alert("Support « " + qrSupport + " » introuvable pour ce chantier.");
-                    }
-                }
-            }
-            qrChantier = "";
-            qrSupport = "";
-            history.replaceState(null, '', location.pathname);
-        }
-
-        function ouvrirFBM() {
-            const chantier = selectChantier.value;
-            const support = selectSupport.value;
-            if (!chantier || !support) {
-                alert("Choisis d'abord un chantier et un support.");
-                return;
-            }
-            if (URL_FBM.includes("TON-COMPTE")) {
-                alert("Adresse de FBM non configurée (constante URL_FBM).");
-                return;
-            }
-            location.href = URL_FBM + "?chantier=" + encodeURIComponent(chantier)
-                                    + "&support=" + encodeURIComponent(support);
-        }
-
         window.addEventListener('DOMContentLoaded', () => {
-            if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('sw.js').catch(console.error);
-            }
+            try {
+                if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.register('sw.js').catch(() => {});
+                }
+            } catch (e) {}
 
             if (userEmail && userName) {
                 document.getElementById('auth-nom').value = userName;
@@ -316,6 +261,142 @@ const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
             }
         });
 
+        /* ================= GESTION DES MENUS LATÉRAUX (SIDEBARS) ================= */
+        function basculerMenuParametres() {
+            const menu = document.getElementById('menuParametres');
+            const backdrop = document.getElementById('sidebarBackdrop');
+            const footer = document.getElementById('footerGauche');
+            const isOpen = menu.classList.contains('open');
+
+            fermerToutesSidebars();
+            if (!isOpen) {
+                menu.classList.add('open');
+                footer.classList.add('open');
+                backdrop.classList.add('active');
+                peuplerSidebarChantiers();
+            }
+        }
+
+        function basculerMenuSupportsDroit() {
+            const chantierActif = document.getElementById('selectChantier').value;
+            if (!chantierActif) {
+                alert("Veuillez d'abord sélectionner un chantier dans le menu de gauche.");
+                basculerMenuParametres();
+                return;
+            }
+
+            const menu = document.getElementById('menuSupportsDroit');
+            const backdrop = document.getElementById('sidebarBackdrop');
+            const footer = document.getElementById('footerDroit');
+            const isOpen = menu.classList.contains('open');
+
+            fermerToutesSidebars();
+            if (!isOpen) {
+                menu.classList.add('open');
+                footer.classList.add('open');
+                backdrop.classList.add('active');
+                peuplerSidebarSupports();
+            }
+        }
+
+        function fermerToutesSidebars() {
+            document.getElementById('menuParametres').classList.remove('open');
+            document.getElementById('menuSupportsDroit').classList.remove('open');
+            document.getElementById('footerGauche').classList.remove('open');
+            document.getElementById('footerDroit').classList.remove('open');
+            document.getElementById('sidebarBackdrop').classList.remove('active');
+        }
+
+        function ouvrirOngletAdminDepuisMenu() {
+            fermerToutesSidebars();
+            changerOnglet(2);
+        }
+
+        function ouvrirFBMDepuisMenu() {
+            fermerToutesSidebars();
+            ouvrirFBM();
+        }
+
+        function actionCopierDepuisMenu() {
+            fermerToutesSidebars();
+            copierTravaux();
+        }
+
+        function actionPartagerPDFDepuisMenu() {
+            fermerToutesSidebars();
+            verifierModificationsEtDemanderRJ('pdf');
+        }
+
+        /* ================= PEUPLEMENT SIDEBARS ================= */
+        function peuplerSidebarChantiers() {
+            const chantiers = [...new Set(rawData.map(r => r.Chantier))].filter(Boolean);
+            const container = document.getElementById('sidebarChantiersContainer');
+            container.innerHTML = '';
+
+            if (chantiers.length === 0) {
+                container.innerHTML = '<p style="color:#777; font-size:12px; font-style:italic; padding:4px;">Aucun chantier disponible</p>';
+                return;
+            }
+
+            const chantierActif = document.getElementById('selectChantier').value;
+
+            chantiers.forEach(c => {
+                const isSelected = (c === chantierActif);
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.style.cssText = `width:100%; text-align:left; padding:10px 14px; border-radius:6px; font-size:13px; font-weight:${isSelected ? 'bold' : 'normal'}; background:${isSelected ? '#2563eb' : '#222'}; color:${isSelected ? '#fff' : '#ccc'}; border:none; cursor:pointer; transition:0.2s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;`;
+                btn.innerText = c;
+                btn.onclick = () => {
+                    document.getElementById('selectChantier').value = c;
+                    document.getElementById('selectChantier').dispatchEvent(new Event('change'));
+                    document.getElementById('labelChantierActif').innerText = c;
+                    fermerToutesSidebars();
+                };
+                container.appendChild(btn);
+            });
+        }
+
+        function peuplerSidebarSupports() {
+            const chantierActif = document.getElementById('selectChantier').value;
+            const filtre = document.getElementById('filtreSupportInput').value.toLowerCase();
+            const supports = [...new Set(rawData.filter(r => r.Chantier === chantierActif).map(r => r.Support))].filter(Boolean);
+            const supportsFiltres = supports.filter(s => s.toLowerCase().includes(filtre));
+            const container = document.getElementById('sidebarSupportsContainer');
+            
+            container.innerHTML = '';
+
+            if (supportsFiltres.length === 0) {
+                container.innerHTML = '<p style="color:#777; font-size:12px; font-style:italic; padding:4px;">Aucun support trouvé</p>';
+                return;
+            }
+
+            const supportActif = document.getElementById('selectSupport').value;
+
+            supportsFiltres.forEach(s => {
+                const isSelected = (s === supportActif);
+                const lignes = rawData.filter(r => r.Chantier === chantierActif && r.Support === s);
+                const total = lignes.length;
+                const faites = lignes.filter(r => ['vrai', 'true', '1'].includes(String(r.Fait).toLowerCase().trim())).length;
+
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.style.cssText = `width:100%; text-align:left; padding:10px 14px; border-radius:6px; font-size:13px; font-weight:${isSelected ? 'bold' : 'normal'}; background:${isSelected ? '#2563eb' : '#222'}; color:${isSelected ? '#fff' : '#ccc'}; border:none; cursor:pointer; display:flex; justify-content:space-between; align-items:center; transition:0.2s;`;
+                btn.innerHTML = `<span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding-right:8px;">${s}</span><span style="font-size:11px; background:${isSelected ? '#1d4ed8' : '#333'}; padding:2px 6px; border-radius:4px; color:#fff;">${faites}/${total}</span>`;
+                btn.onclick = () => {
+                    document.getElementById('selectSupport').value = s;
+                    document.getElementById('selectSupport').dispatchEvent(new Event('change'));
+                    document.getElementById('labelSupportActif').innerText = s;
+                    fermerToutesSidebars();
+                };
+                container.appendChild(btn);
+            });
+        }
+
+        function filtrerListeSupportsDroite() {
+            peuplerSidebarSupports();
+        }
+
+        /* ================= CONNEXION & AUTHENTIFICATION ================= */
         async function enregistrerConnexion() {
             const nomInput = document.getElementById('auth-nom').value.trim();
             const prenomInput = document.getElementById('auth-prenom').value.trim();
@@ -329,7 +410,6 @@ const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
             }
 
             try {
-                // 1. Vérifier si l'utilisateur existe déjà dans app_bob
                 let { data: userRecord, error: searchError } = await supabaseClient
                     .from('app_bob')
                     .select('*')
@@ -338,7 +418,6 @@ const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
 
                 if (searchError) throw searchError;
 
-                // 2. Si l'utilisateur n'existe pas, on le crée avec les accès à false par défaut
                 if (!userRecord) {
                     const { data: newRecord, error: insertError } = await supabaseClient
                         .from('app_bob')
@@ -351,16 +430,14 @@ const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
                     if (insertError) throw insertError;
                     userRecord = newRecord;
                 } else {
-                    // Mettre à jour le nom/prénom si besoin
                     await supabaseClient
                         .from('app_bob')
                         .update({ nom: nomInput, prenom: prenomInput })
                         .eq('email', emailInput);
                 }
 
-                // 3. Vérification de l'autorisation SUTX
                 if (!userRecord || userRecord.sutx !== true) {
-                    errorEl.textContent = "❌ Accès non autorisé. Veuillez contacter l'administrateur pour activer votre accès SUTX.";
+                    errorEl.textContent = "❌ Accès non autorisé. Veuillez contacter l'administrateur.";
                     errorEl.classList.remove('hidden');
                     return;
                 }
@@ -392,15 +469,9 @@ const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
                     .maybeSingle();
 
                 if (error || !userRecord || userRecord.sutx !== true) {
-                    // Accès révoqué ou utilisateur introuvable
-                    ['nomSutx', 'prenomSutx', 'emailSutx'].forEach(k => localStorage.removeItem(k));
+                    localStorage.clear();
                     document.getElementById('auth-overlay').classList.remove('hidden');
                     document.getElementById('main-app').classList.add('hidden');
-                    if (userRecord && userRecord.sutx !== true) {
-                        const errorEl = document.getElementById('auth-error');
-                        errorEl.textContent = "❌ Votre accès SUTX a été désactivé.";
-                        errorEl.classList.remove('hidden');
-                    }
                     return;
                 }
 
@@ -416,39 +487,13 @@ const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
             document.getElementById('main-app').classList.remove('hidden');
             document.getElementById('headerInfo').innerText = `👤 SUTX : ${userPrenom} ${userName}`;
 
-            // Afficher l'onglet d'avancement uniquement si admin est true
-            document.getElementById('btnSidebarAdmin').style.display = userAdmin ? 'block' : 'none';
             if (userAdmin) {
-                document.getElementById('tabPage2').classList.remove('hidden');
+                document.getElementById('btnMenuAdmin').style.display = 'block';
             } else {
-                document.getElementById('tabPage2').classList.add('hidden');
+                document.getElementById('btnMenuAdmin').style.display = 'none';
             }
 
             chargerDonneesSupabase();
-        }
-
-        async function chargerDonneesSupabase() {
-            try {
-                const { data, error } = await supabaseClient
-                    .from('suivi_tx_cat')
-                    .select('*')
-                    .range(0, 9999);
-
-                if (error) throw error;
-
-                rawData = (data || []).map(r => ({ ...r, modifie: false, isCustom: false }));
-                
-                const chantiers = [...new Set(rawData.map(r => r.Chantier))].filter(Boolean);
-                const selectChantier = document.getElementById('selectChantier');
-                selectChantier.innerHTML = '<option value="">Choisir...</option>';
-                chantiers.forEach(c => selectChantier.add(new Option(c, c)));
-
-                rafraichirSidebars();
-                appliquerParamsQR();
-            } catch (err) {
-                console.error("Erreur de chargement des tâches :", err);
-                alert("Erreur lors du chargement des données de chantier.");
-            }
         }
 
         function changerOnglet(numPage) {
@@ -459,19 +504,26 @@ const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
 
             const page1 = document.getElementById('page1');
             const page2 = document.getElementById('page2');
-            const tab1 = document.getElementById('tabPage1');
-            const tab2 = document.getElementById('tabPage2');
+            const btnSaisie = document.getElementById('btnMenuSaisie');
+            const btnAdmin = document.getElementById('btnMenuAdmin');
+            const titrePage = document.getElementById('titrePageCourante');
 
             if (numPage === 1) {
                 page1.classList.remove('hidden');
                 page2.classList.add('hidden');
-                tab1.className = "flex-1 py-2 px-4 rounded-lg font-bold text-sm bg-blue-600 text-white shadow transition";
-                tab2.className = "flex-1 py-2 px-4 rounded-lg font-bold text-sm bg-gray-200 text-gray-700 hover:bg-gray-300 transition";
+                titrePage.innerText = "📋 Saisie & Suivi";
+                btnSaisie.style.background = "#2563eb";
+                btnSaisie.style.color = "#fff";
+                btnAdmin.style.background = "#333";
+                btnAdmin.style.color = "#aaa";
             } else {
                 page1.classList.add('hidden');
                 page2.classList.remove('hidden');
-                tab2.className = "flex-1 py-2 px-4 rounded-lg font-bold text-sm bg-blue-600 text-white shadow transition";
-                tab1.className = "flex-1 py-2 px-4 rounded-lg font-bold text-sm bg-gray-200 text-gray-700 hover:bg-gray-300 transition";
+                titrePage.innerText = "📊 Avancement Chantiers";
+                btnAdmin.style.background = "#2563eb";
+                btnAdmin.style.color = "#fff";
+                btnSaisie.style.background = "#333";
+                btnSaisie.style.color = "#aaa";
                 calculerEtAfficherAvancement();
             }
         }
@@ -514,18 +566,22 @@ const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
         const sectionTachesSupport = document.getElementById('sectionTachesSupport');
         const sectionActionsRapides = document.getElementById('sectionActionsRapides');
         const containerActions = document.getElementById('containerActions');
+        const sectionLienFBM = document.getElementById('sectionLienFBM');
 
         selectChantier.addEventListener('change', () => {
             selectSupport.innerHTML = '<option value="">Choisir...</option>';
+            document.getElementById('labelSupportActif').innerText = "-- Choisir support --";
             sectionTachesSupport.classList.add('hidden');
             sectionActionsRapides.classList.add('hidden');
-            document.getElementById('sectionLienFBM').classList.add('hidden');
+            sectionLienFBM.classList.add('hidden');
             containerTaches.innerHTML = '';
+            
             const chantierChoisi = selectChantier.value;
             if (!chantierChoisi) {
                 selectSupport.disabled = true;
                 return;
             }
+
             const supports = [...new Set(rawData.filter(r => r.Chantier === chantierChoisi).map(r => r.Support))].filter(Boolean);
             supports.forEach(s => selectSupport.add(new Option(s, s)));
             selectSupport.disabled = false;
@@ -533,6 +589,11 @@ const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
 
         selectSupport.addEventListener('change', () => {
             rafraichirAffichageTaches();
+            if (selectSupport.value) {
+                sectionLienFBM.classList.remove('hidden');
+            } else {
+                sectionLienFBM.classList.add('hidden');
+            }
         });
 
         function rafraichirAffichageTaches() {
@@ -544,7 +605,6 @@ const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
                 sectionTachesSupport.classList.add('hidden');
                 sectionActionsRapides.classList.add('hidden');
                 containerActions.classList.add('hidden');
-                document.getElementById('sectionLienFBM').classList.add('hidden');
                 return;
             }
 
@@ -555,17 +615,19 @@ const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
                 const isChecked = ['vrai', 'true', '1'].includes(String(item.Fait).toLowerCase().trim());
                 
                 const div = document.createElement('div');
-                div.className = `p-3 border rounded-lg flex items-center gap-3 ${item.isCustom ? 'bg-amber-50 border-amber-200' : 'bg-gray-50'}`;
+                div.className = `p-3 border rounded-lg flex flex-col sm:flex-row items-start sm:items-center gap-3 ${item.isCustom ? 'bg-amber-50 border-amber-200' : 'bg-gray-50'}`;
                 div.innerHTML = `
-                    <input type="checkbox" ${isChecked ? 'checked' : ''} 
-                        onchange="modifierLigne(${indexGlobal}, 'Fait', this.checked)" 
-                        class="w-6 h-6 text-blue-600 rounded cursor-pointer">
-                    <div class="flex-1 text-sm font-medium text-gray-800">
-                        ${item.Tache} ${item.isCustom ? '<span class="text-xs bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded font-bold ml-2">Ajout manuel</span>' : ''}
+                    <div class="flex items-center gap-3 w-full sm:w-auto">
+                        <input type="checkbox" ${isChecked ? 'checked' : ''} 
+                            onchange="modifierLigne(${indexGlobal}, 'Fait', this.checked)" 
+                            class="w-6 h-6 text-blue-600 rounded cursor-pointer shrink-0">
+                        <div class="flex-1 sm:flex-initial text-sm font-medium text-gray-800">
+                            ${item.Tache} ${item.isCustom ? '<span class="text-xs bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded font-bold ml-2">Ajout manuel</span>' : ''}
+                        </div>
                     </div>
                     <input type="text" value="${item.Observation || ''}" placeholder="Observation..." 
                         onchange="modifierLigne(${indexGlobal}, 'Observation', this.value)" 
-                        class="w-1/3 p-1.5 text-sm border rounded bg-white focus:ring-2 focus:ring-blue-500">
+                        class="w-full sm:w-1/3 p-1.5 text-sm border rounded bg-white focus:ring-2 focus:ring-blue-500 sm:ml-auto">
                 `;
                 containerTaches.appendChild(div);
             });
@@ -573,7 +635,16 @@ const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
             sectionTachesSupport.classList.remove('hidden');
             sectionActionsRapides.classList.remove('hidden');
             containerActions.classList.remove('hidden');
-            document.getElementById('sectionLienFBM').classList.remove('hidden');
+        }
+
+        function ouvrirFBM() {
+            const supportChoisi = selectSupport.value;
+            if (!supportChoisi) {
+                alert("Veuillez sélectionner un support d'abord.");
+                return;
+            }
+            const urlFBM = `https://fbm-sncf.web.app?support=${encodeURIComponent(supportChoisi)}`;
+            window.open(urlFBM, '_blank');
         }
 
         async function cocherToutSupport(etatVoulu) {
@@ -814,7 +885,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
 
             doc.setTextColor(50, 50, 50);
             doc.setFontSize(11);
-            doc.text(`Opérateur : ${userPrenom} ${userName}`, 14, 35);
+            doc.text(`Opérateur : ${userPrenom} ` + userName, 14, 35);
 
             const tableColumns = ["Chantier", "Tâches Réalisées", "Total Tâches", "Avancement"];
             const tableRows = chantiers.map(chantier => {
@@ -852,404 +923,6 @@ const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
             }
 
             doc.save(fileName);
-        }
-
-        /* ================= SIDEBARS GAUCHE / DROITE (comme FBM) ================= */
-        function verifierEtatBackdrop() {
-            const g = document.getElementById('menuParametres');
-            const d = document.getElementById('menuSupportsDroit');
-            const backdrop = document.getElementById('sidebarBackdrop');
-            if (g.style.width === "250px" || d.style.width === "280px") {
-                backdrop.classList.add('active');
-            } else {
-                backdrop.classList.remove('active');
-            }
-        }
-
-        function syncFooters() {
-            const wG = document.getElementById('menuParametres').style.width;
-            const wD = document.getElementById('menuSupportsDroit').style.width;
-            const fG = document.getElementById('footerGauche');
-            const fD = document.getElementById('footerDroit');
-            if (fG) fG.style.width = (wG && wG !== "0" && wG !== "0px") ? wG : "0";
-            if (fD) fD.style.width = (wD && wD !== "0" && wD !== "0px") ? wD : "0";
-        }
-
-        function fermerToutesSidebars() {
-            document.getElementById('menuParametres').style.width = "0";
-            document.getElementById('menuSupportsDroit').style.width = "0";
-            syncFooters();
-            verifierEtatBackdrop();
-        }
-
-        function basculerMenuParametres() {
-            const menu = document.getElementById('menuParametres');
-            document.getElementById('menuSupportsDroit').style.width = "0";
-            menu.style.width = (menu.style.width === "250px") ? "0" : "250px";
-            syncFooters();
-            verifierEtatBackdrop();
-        }
-
-        function basculerMenuSupportsDroit() {
-            // Pas de chantier choisi : on ouvre d'abord la liste des chantiers
-            if (!selectChantier.value) {
-                basculerMenuParametres();
-                return;
-            }
-            const menu = document.getElementById('menuSupportsDroit');
-            document.getElementById('menuParametres').style.width = "0";
-            if (menu.style.width === "280px") {
-                menu.style.width = "0";
-            } else {
-                menu.style.width = "280px";
-                mettreAJourBoutonsSupportsSidebar();
-                document.getElementById('filtreSupportInput').value = '';
-                filtrerListeSupportsDroite();
-            }
-            syncFooters();
-            verifierEtatBackdrop();
-        }
-
-        const STYLE_BTN_LISTE = "padding: 8px 12px; font-size: 14px; background: #222; color: #ccc; border: 1px solid #444; border-radius: 4px; text-align: left; cursor: pointer; transition: 0.2s; width: 100%;";
-
-        function styliserBoutonActif(btn) {
-            btn.style.backgroundColor = '#2563eb';
-            btn.style.color = '#fff';
-            btn.style.borderColor = '#3b82f6';
-            btn.style.fontWeight = 'bold';
-        }
-
-        function mettreAJourBoutonsChantiersSidebar() {
-            const container = document.getElementById('sidebarChantiersContainer');
-            const label = document.getElementById('labelChantierActif');
-            if (!container) return;
-            container.innerHTML = '';
-            let texteActif = "Aucun chantier";
-
-            Array.from(selectChantier.options).forEach(opt => {
-                if (!opt.value) return;
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.innerText = opt.text;
-                btn.style.cssText = STYLE_BTN_LISTE;
-                if (selectChantier.value === opt.value) {
-                    styliserBoutonActif(btn);
-                    texteActif = opt.text;
-                }
-                btn.onclick = () => {
-                    selectChantier.value = opt.value;
-                    selectChantier.dispatchEvent(new Event('change'));
-                    fermerToutesSidebars();
-                };
-                container.appendChild(btn);
-            });
-            if (label) label.innerText = texteActif;
-        }
-
-        function mettreAJourBoutonsSupportsSidebar() {
-            const container = document.getElementById('sidebarSupportsContainer');
-            const label = document.getElementById('labelSupportActif');
-            if (!container) return;
-            container.innerHTML = '';
-            let texteActif = "-- Choisir support --";
-
-            Array.from(selectSupport.options).forEach(opt => {
-                if (!opt.value) return;
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.className = 'support-sidebar-item';
-                btn.innerText = opt.text;
-                btn.style.cssText = STYLE_BTN_LISTE;
-                if (selectSupport.value === opt.value) {
-                    styliserBoutonActif(btn);
-                    texteActif = opt.text;
-                }
-                btn.onclick = () => {
-                    selectSupport.value = opt.value;
-                    selectSupport.dispatchEvent(new Event('change'));
-                    fermerToutesSidebars();
-                };
-                container.appendChild(btn);
-            });
-            if (label) label.innerText = texteActif;
-        }
-
-        function rafraichirSidebars() {
-            mettreAJourBoutonsChantiersSidebar();
-            mettreAJourBoutonsSupportsSidebar();
-        }
-
-        function filtrerListeSupportsDroite() {
-            const input = document.getElementById('filtreSupportInput');
-            const container = document.getElementById('sidebarSupportsContainer');
-            if (!input || !container) return;
-
-            const normalizeStr = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-            const filtre = normalizeStr(input.value);
-            const boutons = container.getElementsByClassName('support-sidebar-item');
-
-            let visibleCount = 0;
-            Array.from(boutons).forEach(btn => {
-                if (normalizeStr(btn.innerText).includes(filtre)) {
-                    btn.style.display = 'block';
-                    visibleCount++;
-                } else {
-                    btn.style.display = 'none';
-                }
-            });
-
-            let msg = document.getElementById('noResultSupportMsg');
-            if (visibleCount === 0 && filtre.length > 0) {
-                if (!msg) {
-                    msg = document.createElement('div');
-                    msg.id = 'noResultSupportMsg';
-                    msg.style.cssText = "color: #888; font-size: 13px; text-align: center; padding: 15px;";
-                    msg.innerText = "Aucun support trouvé.";
-                    container.appendChild(msg);
-                }
-                msg.style.display = 'block';
-            } else if (msg) {
-                msg.style.display = 'none';
-            }
-        }
-
-        // Actions des menus
-        function ouvrirOngletAdminDepuisMenu() {
-            fermerToutesSidebars();
-            changerOnglet(2);
-        }
-        function ouvrirFBMDepuisMenu() {
-            fermerToutesSidebars();
-            ouvrirFBM();
-        }
-        function actionCopierDepuisMenu() {
-            fermerToutesSidebars();
-            copierTravaux();
-        }
-        function actionPartagerPDFDepuisMenu() {
-            fermerToutesSidebars();
-            document.getElementById('btnSharePDF').click();
-        }
-
-        // Garde les sidebars et les libellés synchronisés avec les listes cachées
-        selectChantier.addEventListener('change', rafraichirSidebars);
-        selectSupport.addEventListener('change', rafraichirSidebars);
-
-        /* ================= OUVERTURE / FERMETURE DES SIDEBARS AU GLISSER (même logique que FBM) ================= */
-        let touchStartX = 0;
-        let touchStartY = 0;
-        const minSwipeDistance = 50;
-
-        function ecranParDessusOuvert() {
-            return ['auth-overlay', 'divRJModal', 'divAjoutTacheModal', 'divScanModal'].some(id => {
-                const e = document.getElementById(id);
-                return e && !e.classList.contains('hidden');
-            });
-        }
-
-        document.addEventListener('touchstart', e => {
-            touchStartX = e.changedTouches[0].clientX;
-            touchStartY = e.changedTouches[0].clientY;
-        }, { passive: true });
-
-        document.addEventListener('touchend', e => {
-            if (ecranParDessusOuvert()) return;
-            const diff = e.changedTouches[0].clientX - touchStartX;
-            const diffY = e.changedTouches[0].clientY - touchStartY;
-            if (Math.abs(diff) <= Math.abs(diffY)) return; // geste plutôt vertical : c'est un défilement
-
-            const menuGauche = document.getElementById('menuParametres');
-            const menuDroit = document.getElementById('menuSupportsDroit');
-            const gaucheOuverte = menuGauche.style.width === "250px";
-            const droiteOuverte = menuDroit.style.width === "280px";
-
-            // Depuis le bord gauche vers la droite : ouvre la sidebar gauche
-            if (touchStartX < 50 && diff > minSwipeDistance && !gaucheOuverte) {
-                basculerMenuParametres();
-                return;
-            }
-            // Sidebar gauche ouverte : glisser vers la gauche ferme
-            if (gaucheOuverte && diff < -minSwipeDistance) {
-                fermerToutesSidebars();
-                return;
-            }
-            // Depuis le bord droit vers la gauche : ouvre la sidebar des supports
-            if (touchStartX > window.innerWidth - 50 && diff < -minSwipeDistance && !droiteOuverte) {
-                basculerMenuSupportsDroit();
-                return;
-            }
-            // Sidebar droite ouverte : glisser vers la droite ferme
-            if (droiteOuverte && diff > minSwipeDistance) {
-                fermerToutesSidebars();
-            }
-        }, { passive: true });
-
-
-        /* ================= SCAN QR CODE (chantier + support) ================= */
-        let scanStream = null;
-        let scanActif = false;
-        let scanDetector = null;
-        const scanCanvas = document.createElement('canvas');
-
-        function normaliserTexte(t) {
-            return (t || '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-        }
-
-        function afficherToast(message) {
-            let t = document.getElementById('toastSutx');
-            if (!t) {
-                t = document.createElement('div');
-                t.id = 'toastSutx';
-                t.style.cssText = "position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:#111; color:#fff; padding:10px 16px; border-radius:10px; font-size:14px; font-weight:bold; z-index:1200; max-width:90%; text-align:center; box-shadow:0 4px 12px rgba(0,0,0,0.4);";
-                document.body.appendChild(t);
-            }
-            t.innerText = message;
-            t.style.display = 'block';
-            clearTimeout(t._timer);
-            t._timer = setTimeout(() => { t.style.display = 'none'; }, 3500);
-        }
-
-        async function scannerQRCode() {
-            fermerToutesSidebars();
-            if (!rawData.length) { alert("Les données ne sont pas encore chargées."); return; }
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                alert("Caméra indisponible sur cet appareil ou cette page (HTTPS requis).");
-                return;
-            }
-            try {
-                scanStream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: { ideal: 'environment' } }, audio: false
-                });
-            } catch (err) {
-                alert("Accès à la caméra refusé ou impossible.");
-                return;
-            }
-            const video = document.getElementById('scanVideo');
-            video.srcObject = scanStream;
-            document.getElementById('divScanModal').classList.remove('hidden');
-            try { await video.play(); } catch (e) {}
-
-            if (!scanDetector && 'BarcodeDetector' in window) {
-                try { scanDetector = new BarcodeDetector({ formats: ['qr_code'] }); } catch (e) { scanDetector = null; }
-            }
-            scanActif = true;
-            boucleScan();
-        }
-
-        function arreterScan() {
-            scanActif = false;
-            if (scanStream) {
-                scanStream.getTracks().forEach(t => t.stop());
-                scanStream = null;
-            }
-            const video = document.getElementById('scanVideo');
-            if (video) video.srcObject = null;
-            document.getElementById('divScanModal').classList.add('hidden');
-        }
-
-        async function lireQRDepuisVideo(video) {
-            if (scanDetector) {
-                try {
-                    const codes = await scanDetector.detect(video);
-                    if (codes.length) return codes[0].rawValue;
-                    return null;
-                } catch (e) {
-                    scanDetector = null; // on bascule sur jsQR
-                }
-            }
-            if (typeof jsQR !== 'function' || !video.videoWidth) return null;
-            const echelle = Math.min(1, 640 / video.videoWidth);
-            scanCanvas.width = Math.round(video.videoWidth * echelle);
-            scanCanvas.height = Math.round(video.videoHeight * echelle);
-            const ctx = scanCanvas.getContext('2d', { willReadFrequently: true });
-            ctx.drawImage(video, 0, 0, scanCanvas.width, scanCanvas.height);
-            const img = ctx.getImageData(0, 0, scanCanvas.width, scanCanvas.height);
-            const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
-            return code ? code.data : null;
-        }
-
-        async function boucleScan() {
-            if (!scanActif) return;
-            const video = document.getElementById('scanVideo');
-            if (video.readyState >= 2) {
-                const texte = await lireQRDepuisVideo(video);
-                if (texte && scanActif) {
-                    arreterScan();
-                    traiterContenuQR(texte);
-                    return;
-                }
-            }
-            setTimeout(boucleScan, 150);
-        }
-
-        // Trouve chantier + support à partir du contenu du QR :
-        // lien (?chantier=&support=), JSON, ou texte contenant les noms
-        function extraireChantierSupport(texte) {
-            const raw = texte.trim();
-            let c = "", sup = "";
-            try {
-                const u = new URL(raw);
-                c = u.searchParams.get('chantier') || "";
-                sup = u.searchParams.get('support') || "";
-            } catch (e) {}
-            if (!c) {
-                try {
-                    const o = JSON.parse(raw);
-                    c = o.chantier || o.Chantier || "";
-                    sup = o.support || o.Support || "";
-                } catch (e) {}
-            }
-            return { c, sup };
-        }
-
-        function traiterContenuQR(texte) {
-            const { c, sup } = extraireChantierSupport(texte);
-            const chantiers = [...new Set(rawData.map(r => r.Chantier))].filter(Boolean);
-            const supportsDe = ch => [...new Set(rawData.filter(r => r.Chantier === ch).map(r => r.Support))].filter(Boolean);
-            const plusLong = (liste, N) => liste.filter(v => N.includes(normaliserTexte(v)))
-                                                .sort((a, b) => b.length - a.length)[0];
-
-            let chantierTrouve = "", supportTrouve = "";
-
-            if (c) {
-                chantierTrouve = chantiers.find(x => normaliserTexte(x) === normaliserTexte(c)) || "";
-                if (chantierTrouve && sup) {
-                    supportTrouve = supportsDe(chantierTrouve).find(x => normaliserTexte(x) === normaliserTexte(sup)) || "";
-                }
-            } else {
-                // Texte libre : on cherche les noms dans le contenu du QR
-                const N = normaliserTexte(texte);
-                chantierTrouve = plusLong(chantiers, N) || "";
-                if (chantierTrouve) {
-                    supportTrouve = plusLong(supportsDe(chantierTrouve), N) || "";
-                } else {
-                    // Pas de chantier reconnu : on tente par le support seul (s'il n'existe que dans un chantier)
-                    const paires = [...new Set(rawData.filter(r => r.Support && N.includes(normaliserTexte(r.Support)))
-                                                     .map(r => r.Chantier + '||' + r.Support))];
-                    if (paires.length) {
-                        const meilleur = paires.map(p => p.split('||'))
-                            .sort((a, b) => b[1].length - a[1].length)[0];
-                        const memeLongueur = paires.map(p => p.split('||')).filter(p => p[1].length === meilleur[1].length);
-                        if (memeLongueur.length === 1) { chantierTrouve = meilleur[0]; supportTrouve = meilleur[1]; }
-                    }
-                }
-            }
-
-            if (!chantierTrouve) {
-                alert("QR non reconnu :\n" + texte.slice(0, 200));
-                return;
-            }
-
-            selectChantier.value = chantierTrouve;
-            selectChantier.dispatchEvent(new Event('change'));
-            if (supportTrouve) {
-                selectSupport.value = supportTrouve;
-                selectSupport.dispatchEvent(new Event('change'));
-                afficherToast("✅ " + chantierTrouve + " • " + supportTrouve);
-            } else {
-                afficherToast("✅ " + chantierTrouve + " (support non reconnu, choisis-le)");
-                basculerMenuSupportsDroit();
-            }
         }
     </script>
 </body>
