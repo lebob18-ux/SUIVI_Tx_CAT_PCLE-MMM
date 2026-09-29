@@ -273,6 +273,13 @@
 
     <script>
         /* ================= CONFIGURATION SUPABASE ET VARIABLES ================= */
+        const APP_NAME = "suivi_tx_cat";
+        const CACHE_KEY = `cache_${APP_NAME}`;
+        const EMAIL_KEY = `email_${APP_NAME}`;
+        const NOM_KEY = `nom_${APP_NAME}`;
+        const PRENOM_KEY = `prenom_${APP_NAME}`;
+        const ADMIN_KEY = `admin_${APP_NAME}`;
+
         const SUPABASE_URL = "https://thbqkeugjvsxbryfnzuo.supabase.co";
         const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
 
@@ -302,19 +309,19 @@
             document.getElementById('divPopupDiagnostic').classList.remove('hidden');
         }
 
-function viderLocalStorageApp() {
-    if (confirm("Voulez-vous vraiment vider tout le LocalStorage de l'application (cache et session) ?")) {
-        localStorage.clear();
-        logDiag("LocalStorage vidé par l'utilisateur.");
-        
-        // Nettoie l'URL pour enlever les paramètres ?chantier=...&support=...
-        const urlPropre = window.location.origin + window.location.pathname;
-        window.history.replaceState({}, document.title, urlPropre);
-        
-        alert("LocalStorage et URL nettoyés avec succès. L'application va recharger.");
-        location.reload();
-    }
-}
+        function viderLocalStorageApp() {
+            if (confirm("Voulez-vous vraiment vider tout le LocalStorage de l'application (cache et session) ?")) {
+                localStorage.removeItem(CACHE_KEY);
+                logDiag("Cache de l'application vidé.");
+                
+                // Nettoie l'URL pour enlever les paramètres ?chantier=...&support=...
+                const urlPropre = window.location.origin + window.location.pathname;
+                window.history.replaceState({}, document.title, urlPropre);
+                
+                alert("LocalStorage et URL nettoyés avec succès. L'application va recharger.");
+                location.reload();
+            }
+        }
 
         // Gestion du réseau et de la file d'attente hors-ligne
         let estEnLigne = navigator.onLine;
@@ -386,7 +393,7 @@ function viderLocalStorageApp() {
                     if (error) throw error;
                     rawData = data || [];
                     logDiag(`Données reçues de Supabase : ${rawData.length} lignes.`);
-                    localStorage.setItem('cache_suivi_sutx', JSON.stringify(rawData));
+                    localStorage.setItem(CACHE_KEY, JSON.stringify(rawData));
                 } else {
                     logDiag("Mode hors-ligne : chargement depuis le cache local...");
                     chargerDonneesLocalesCache();
@@ -401,7 +408,7 @@ function viderLocalStorageApp() {
         }
 
         function chargerDonneesLocalesCache() {
-            const cache = localStorage.getItem('cache_suivi_sutx');
+            const cache = localStorage.getItem(CACHE_KEY);
             if (cache) {
                 try {
                     rawData = JSON.parse(cache);
@@ -507,68 +514,68 @@ function viderLocalStorageApp() {
             document.getElementById('divQRModal').classList.add('hidden');
         }
 
-function traiterTexteQR(texte) {
-    fermerModalScanQR();
-    let supportTrouve = texte.trim();
-    let chantierTrouve = "";
-    logDiag(`Traitement du texte scanné : "${texte}"`);
+        function traiterTexteQR(texte) {
+            fermerModalScanQR();
+            let supportTrouve = texte.trim();
+            let chantierTrouve = "";
+            logDiag(`Traitement du texte scanné : "${texte}"`);
 
-    if (texte.includes('?')) {
-        try {
-            const urlObj = new URL(texte);
-            const paramChantier = urlObj.searchParams.get('chantier');
-            const paramSupport = urlObj.searchParams.get('support');
-            if (paramChantier) chantierTrouve = decodeURIComponent(paramChantier).trim();
-            if (paramSupport) supportTrouve = decodeURIComponent(paramSupport).trim();
-            logDiag(`Format URL détecté -> Chantier: "${chantierTrouve}" | Support: "${supportTrouve}"`);
-        } catch (e) {
-            logDiag(`⚠️ Erreur parsing URL du QR code : ${e.message}`);
+            if (texte.includes('?')) {
+                try {
+                    const urlObj = new URL(texte);
+                    const paramChantier = urlObj.searchParams.get('chantier');
+                    const paramSupport = urlObj.searchParams.get('support');
+                    if (paramChantier) chantierTrouve = decodeURIComponent(paramChantier).trim();
+                    if (paramSupport) supportTrouve = decodeURIComponent(paramSupport).trim();
+                    logDiag(`Format URL détecté -> Chantier: "${chantierTrouve}" | Support: "${supportTrouve}"`);
+                } catch (e) {
+                    logDiag(`⚠️ Erreur parsing URL du QR code : ${e.message}`);
+                }
+            } else if (texte.includes('|')) {
+                const parts = texte.split('|');
+                chantierTrouve = parts[0].trim();
+                supportTrouve = parts[1].trim();
+                logDiag(`Format séparé détecté -> Chantier: "${chantierTrouve}" | Support: "${supportTrouve}"`);
+            } else {
+                logDiag(`Format simple détecté (support seul) -> Support: "${supportTrouve}"`);
+            }
+
+            if (chantierTrouve) {
+                const selectC = document.getElementById('selectChantier');
+                const chantiersDispos = [...selectC.options].map(o => o.value);
+                if (chantiersDispos.includes(chantierTrouve)) {
+                    selectC.value = chantierTrouve;
+                    selectC.dispatchEvent(new Event('change'));
+                    document.getElementById('labelChantierActif').innerText = chantierTrouve;
+                    logDiag(`Chantier "${chantierTrouve}" appliqué avec succès.`);
+                } else {
+                    logDiag(`❌ ÉCHEC Chantier : Le chantier "${chantierTrouve}" n'existe pas.`);
+                    afficherPopupDiagnostic();
+                    return;
+                }
+            }
+
+            const chantierActif = document.getElementById('selectChantier').value;
+            if (!chantierActif) {
+                logDiag(`❌ ÉCHEC : Aucun chantier actif sélectionné.`);
+                basculerMenuParametres();
+                afficherPopupDiagnostic();
+                return;
+            }
+
+            const supports = [...new Set(rawData.filter(r => r.Chantier === chantierActif).map(r => r.Support))].filter(Boolean);
+            
+            if (supports.includes(supportTrouve)) {
+                const selectS = document.getElementById('selectSupport');
+                selectS.value = supportTrouve;
+                selectS.dispatchEvent(new Event('change'));
+                document.getElementById('labelSupportActif').innerText = supportTrouve;
+                logDiag(`✅ Support "${supportTrouve}" trouvé et sélectionné avec succès !`);
+            } else {
+                logDiag(`❌ ÉCHEC Support : Le support "${supportTrouve}" est introuvable dans le chantier "${chantierActif}".`);
+                afficherPopupDiagnostic();
+            }
         }
-    } else if (texte.includes('|')) {
-        const parts = texte.split('|');
-        chantierTrouve = parts[0].trim();
-        supportTrouve = parts[1].trim();
-        logDiag(`Format séparé détecté -> Chantier: "${chantierTrouve}" | Support: "${supportTrouve}"`);
-    } else {
-        logDiag(`Format simple détecté (support seul) -> Support: "${supportTrouve}"`);
-    }
-
-    if (chantierTrouve) {
-        const selectC = document.getElementById('selectChantier');
-        const chantiersDispos = [...selectC.options].map(o => o.value);
-        if (chantiersDispos.includes(chantierTrouve)) {
-            selectC.value = chantierTrouve;
-            selectC.dispatchEvent(new Event('change'));
-            document.getElementById('labelChantierActif').innerText = chantierTrouve;
-            logDiag(`Chantier "${chantierTrouve}" appliqué avec succès.`);
-        } else {
-            logDiag(`❌ ÉCHEC Chantier : Le chantier "${chantierTrouve}" n'existe pas.`);
-            afficherPopupDiagnostic();
-            return;
-        }
-    }
-
-    const chantierActif = document.getElementById('selectChantier').value;
-    if (!chantierActif) {
-        logDiag(`❌ ÉCHEC : Aucun chantier actif sélectionné.`);
-        basculerMenuParametres();
-        afficherPopupDiagnostic();
-        return;
-    }
-
-    const supports = [...new Set(rawData.filter(r => r.Chantier === chantierActif).map(r => r.Support))].filter(Boolean);
-    
-    if (supports.includes(supportTrouve)) {
-        const selectS = document.getElementById('selectSupport');
-        selectS.value = supportTrouve;
-        selectS.dispatchEvent(new Event('change'));
-        document.getElementById('labelSupportActif').innerText = supportTrouve;
-        logDiag(`✅ Support "${supportTrouve}" trouvé et sélectionné avec succès !`);
-    } else {
-        logDiag(`❌ ÉCHEC Support : Le support "${supportTrouve}" est introuvable dans le chantier "${chantierActif}".`);
-        afficherPopupDiagnostic(); // Affiche le popup de log au lieu d'une alerte bloquante
-    }
-}
 
         /* ================= GESTION DES SIDEBARS ================= */
         function basculerMenuParametres() {
@@ -586,13 +593,13 @@ function traiterTexteQR(texte) {
             }
         }
 
-function basculerMenuSupportsDroit() {
-    const chantierActif = document.getElementById('selectChantier').value;
-    if (!chantierActif) {
-        logDiag("Tentative d'ouverture des supports sans chantier actif.");
-        basculerMenuParametres(); // Ouvre directement le choix du chantier sans bloquer par un alert
-        return;
-    }
+        function basculerMenuSupportsDroit() {
+            const chantierActif = document.getElementById('selectChantier').value;
+            if (!chantierActif) {
+                logDiag("Tentative d'ouverture des supports sans chantier actif.");
+                basculerMenuParametres();
+                return;
+            }
 
             const menu = document.getElementById('menuSupportsDroit');
             const backdrop = document.getElementById('sidebarBackdrop');
@@ -838,23 +845,22 @@ function basculerMenuSupportsDroit() {
             }
         }
 
-function lancerApplication() {
-    logDiag("Lancement de l'application principal.");
-    document.getElementById('auth-overlay').classList.add('hidden');
-    document.getElementById('main-app').classList.remove('hidden');
-    document.getElementById('headerInfo').querySelector('span').innerText = `👤 SUTX : ${userPrenom} ${userName}`;
+        function lancerApplication() {
+            logDiag("Lancement de l'application principal.");
+            document.getElementById('auth-overlay').classList.add('hidden');
+            document.getElementById('main-app').classList.remove('hidden');
+            document.getElementById('headerInfo').querySelector('span').innerText = `👤 SUTX : ${userPrenom} ${userName}`;
 
-    if (userAdmin) {
-        document.getElementById('btnMenuAdmin').style.display = 'block';
-    } else {
-        document.getElementById('btnMenuAdmin').style.display = 'none';
-    }
+            if (userAdmin) {
+                document.getElementById('btnMenuAdmin').style.display = 'block';
+            } else {
+                document.getElementById('btnMenuAdmin').style.display = 'none';
+            }
 
-    chargerDonneesSupabase().then(() => {
-        // Vérifie les paramètres dans l'URL (si l'app a été ouverte via un QR code externe)
-        verifierParametresURLAuDemarrage();
-    });
-}
+            chargerDonneesSupabase().then(() => {
+                verifierParametresURLAuDemarrage();
+            });
+        }
 
         function changerOnglet(numPage) {
             if (numPage === 2 && !userAdmin) {
@@ -1119,7 +1125,7 @@ function lancerApplication() {
         }
 
         function sauvegarderCacheLocal() {
-            localStorage.setItem('cache_suivi_sutx', JSON.stringify(rawData));
+            localStorage.setItem(CACHE_KEY, JSON.stringify(rawData));
         }
 
         function enregistrerFileAttenteModif() {
@@ -1219,47 +1225,48 @@ function lancerApplication() {
             document.getElementById('rjInput').value = sessionRJ || "";
             document.getElementById('divRJModal').classList.remove('hidden');
         }
-function verifierParametresURLAuDemarrage() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const chantierParam = urlParams.get('chantier');
-    const supportParam = urlParams.get('support');
-    
-    if (chantierParam || supportParam) {
-        logDiag(`Paramètres URL détectés au lancement -> Chantier: "${chantierParam}" | Support: "${supportParam}"`);
-        
-        if (chantierParam) {
-            const selectC = document.getElementById('selectChantier');
-            const chantiersDispos = [...selectC.options].map(o => o.value);
-            if (chantiersDispos.includes(chantierParam)) {
-                selectC.value = chantierParam;
-                selectC.dispatchEvent(new Event('change'));
-                document.getElementById('labelChantierActif').innerText = chantierParam;
-                logDiag(`Chantier URL "${chantierParam}" appliqué avec succès.`);
-            } else {
-                logDiag(`❌ ÉCHEC Chantier URL : "${chantierParam}" introuvable.`);
+
+        function verifierParametresURLAuDemarrage() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const chantierParam = urlParams.get('chantier');
+            const supportParam = urlParams.get('support');
+            
+            if (chantierParam || supportParam) {
+                logDiag(`Paramètres URL détectés au lancement -> Chantier: "${chantierParam}" | Support: "${supportParam}"`);
+                
+                if (chantierParam) {
+                    const selectC = document.getElementById('selectChantier');
+                    const chantiersDispos = [...selectC.options].map(o => o.value);
+                    if (chantiersDispos.includes(chantierParam)) {
+                        selectC.value = chantierParam;
+                        selectC.dispatchEvent(new Event('change'));
+                        document.getElementById('labelChantierActif').innerText = chantierParam;
+                        logDiag(`Chantier URL "${chantierParam}" appliqué avec succès.`);
+                    } else {
+                        logDiag(`❌ ÉCHEC Chantier URL : "${chantierParam}" introuvable.`);
+                    }
+                }
+                
+                if (supportParam) {
+                    setTimeout(() => {
+                        const chantierActif = document.getElementById('selectChantier').value;
+                        const supports = [...new Set(rawData.filter(r => r.Chantier === chantierActif).map(r => r.Support))].filter(Boolean);
+                        
+                        if (supports.includes(supportParam)) {
+                            const selectS = document.getElementById('selectSupport');
+                            selectS.value = supportParam;
+                            selectS.dispatchEvent(new Event('change'));
+                            document.getElementById('labelSupportActif').innerText = supportParam;
+                            logDiag(`✅ Support URL "${supportParam}" sélectionné avec succès !`);
+                        } else {
+                            logDiag(`❌ ÉCHEC Support URL : "${supportParam}" introuvable dans le chantier.`);
+                            afficherPopupDiagnostic();
+                        }
+                    }, 300);
+                }
             }
         }
-        
-        if (supportParam) {
-            // Petit délai pour laisser le temps au select chantier de charger ses supports
-            setTimeout(() => {
-                const chantierActif = document.getElementById('selectChantier').value;
-                const supports = [...new Set(rawData.filter(r => r.Chantier === chantierActif).map(r => r.Support))].filter(Boolean);
-                
-                if (supports.includes(supportParam)) {
-                    const selectS = document.getElementById('selectSupport');
-                    selectS.value = supportParam;
-                    selectS.dispatchEvent(new Event('change'));
-                    document.getElementById('labelSupportActif').innerText = supportParam;
-                    logDiag(`✅ Support URL "${supportParam}" sélectionné avec succès !`);
-                } else {
-                    logDiag(`❌ ÉCHEC Support URL : "${supportParam}" introuvable dans le chantier.`);
-                    afficherPopupDiagnostic();
-                }
-            }, 300);
-        }
-    }
-}
+
         function executerActionEnAttente() {
             const saisiRJ = document.getElementById('rjInput').value.trim();
             if (!saisiRJ) {
