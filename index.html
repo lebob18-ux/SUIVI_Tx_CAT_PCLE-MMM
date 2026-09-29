@@ -239,6 +239,11 @@
             return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
         }
 
+        // Tri croissant "naturel" (Support 2 avant Support 10)
+        function trierCroissant(a, b) {
+            return String(a).localeCompare(String(b), 'fr', { numeric: true, sensitivity: 'base' });
+        }
+
         // Gestion du réseau et de la file d'attente hors-ligne
         let estEnLigne = navigator.onLine;
 
@@ -318,6 +323,8 @@
                         if (cible) {
                             cible.Fait = p.Fait;
                             cible.Observation = p.Observation;
+                            cible.nom = p.nom;
+                            cible.prenom = p.prenom;
                             cible.modifie = true;
                             cible.aSync = true;
                         } else if (!p.id) {
@@ -481,7 +488,7 @@
         function peuplerSidebarSupports() {
             const chantierActif = document.getElementById('selectChantier').value;
             const filtre = document.getElementById('filtreSupportInput').value.toLowerCase();
-            const supports = [...new Set(rawData.filter(r => r.Chantier === chantierActif).map(r => r.Support))].filter(Boolean);
+            const supports = [...new Set(rawData.filter(r => r.Chantier === chantierActif).map(r => r.Support))].filter(Boolean).sort(trierCroissant);
             const supportsFiltres = supports.filter(s => s.toLowerCase().includes(filtre));
             const container = document.getElementById('sidebarSupportsContainer');
             
@@ -704,7 +711,7 @@
                 contenuSupports.className = "hidden p-4 border-t bg-gray-50/50 space-y-3";
 
                 // Récupérer les supports de ce chantier
-                const supports = [...new Set(lignesChantier.map(r => r.Support))].filter(Boolean);
+                const supports = [...new Set(lignesChantier.map(r => r.Support))].filter(Boolean).sort(trierCroissant);
                 
                 supports.forEach(support => {
                     const lignesSupport = lignesChantier.filter(r => r.Support === support);
@@ -780,7 +787,7 @@
                 return;
             }
 
-            const supports = [...new Set(rawData.filter(r => r.Chantier === chantierChoisi).map(r => r.Support))].filter(Boolean);
+            const supports = [...new Set(rawData.filter(r => r.Chantier === chantierChoisi).map(r => r.Support))].filter(Boolean).sort(trierCroissant);
             supports.forEach(s => selectSupport.add(new Option(s, s)));
             selectSupport.disabled = false;
         });
@@ -845,14 +852,14 @@
             if (!chantierChoisi || !supportChoisi) return;
 
             const lignes = rawData.filter(r => r.Chantier === chantierChoisi && r.Support === supportChoisi);
-            lignes.forEach(r => { r.Fait = etatVoulu; r.modifie = true; });
+            lignes.forEach(r => { r.Fait = etatVoulu; r.modifie = true; r.nom = userName; r.prenom = userPrenom; });
 
             let envoye = false;
             if (estEnLigne) {
                 try {
                     const { error } = await supabaseClient
                         .from('suivi_tx_cat')
-                        .update({ Fait: etatVoulu })
+                        .update({ Fait: etatVoulu, nom: userName, prenom: userPrenom })
                         .eq('Chantier', chantierChoisi)
                         .eq('Support', supportChoisi);
                     if (error) throw error;
@@ -873,6 +880,8 @@
             const ligne = rawData[index];
             ligne[champ] = valeur;
             ligne.modifie = true;
+            ligne.nom = userName;
+            ligne.prenom = userPrenom;
             sauvegarderCacheLocal();
             rafraichirAffichageTaches();
 
@@ -881,7 +890,7 @@
                 try {
                     const { error } = await supabaseClient
                         .from('suivi_tx_cat')
-                        .update({ [champ]: valeur })
+                        .update({ [champ]: valeur, nom: userName, prenom: userPrenom })
                         .eq('id', ligne.id);
                     if (error) throw error;
                     envoye = true;
@@ -915,7 +924,7 @@
                     if (item.id) {
                         const { error } = await supabaseClient
                             .from('suivi_tx_cat')
-                            .update({ Fait: item.Fait, Observation: item.Observation })
+                            .update({ Fait: item.Fait, Observation: item.Observation, nom: item.nom || userName, prenom: item.prenom || userPrenom })
                             .eq('id', item.id);
                         if (error) throw error;
                     } else {
@@ -926,7 +935,9 @@
                                 Support: item.Support,
                                 Tache: item.Tache,
                                 Fait: item.Fait,
-                                Observation: item.Observation
+                                Observation: item.Observation,
+                                nom: item.nom || userName,
+                                prenom: item.prenom || userPrenom
                             }])
                             .select();
                         if (error) throw error;
@@ -969,6 +980,8 @@
                 Tache: intitule,
                 Fait: true,
                 Observation: "Travail non prévu ajouté manuellement",
+                nom: userName,
+                prenom: userPrenom,
                 modifie: true,
                 isCustom: true
             };
@@ -982,7 +995,9 @@
                             Support: supportChoisi,
                             Tache: intitule,
                             Fait: true,
-                            Observation: "Travail non prévu ajouté manuellement"
+                            Observation: "Travail non prévu ajouté manuellement",
+                            nom: userName,
+                            prenom: userPrenom
                         }])
                         .select();
 
