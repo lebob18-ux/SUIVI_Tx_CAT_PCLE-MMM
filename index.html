@@ -302,13 +302,19 @@
             document.getElementById('divPopupDiagnostic').classList.remove('hidden');
         }
 
-        function viderLocalStorageApp() {
-            if (confirm("Voulez-vous vraiment vider tout le LocalStorage de l'application (cache et session) ?")) {
-                localStorage.clear();
-                alert("LocalStorage vidé avec succès. L'application va recharger.");
-                location.reload();
-            }
-        }
+function viderLocalStorageApp() {
+    if (confirm("Voulez-vous vraiment vider tout le LocalStorage de l'application (cache et session) ?")) {
+        localStorage.clear();
+        logDiag("LocalStorage vidé par l'utilisateur.");
+        
+        // Nettoie l'URL pour enlever les paramètres ?chantier=...&support=...
+        const urlPropre = window.location.origin + window.location.pathname;
+        window.history.replaceState({}, document.title, urlPropre);
+        
+        alert("LocalStorage et URL nettoyés avec succès. L'application va recharger.");
+        location.reload();
+    }
+}
 
         // Gestion du réseau et de la file d'attente hors-ligne
         let estEnLigne = navigator.onLine;
