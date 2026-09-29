@@ -81,6 +81,9 @@
 
         <button class="sidebar-action-btn" onclick="ouvrirFBMDepuisMenu()">🚧 Ouvrir FBM</button>
         <button class="sidebar-action-btn" onclick="ouvrirNotesGlobalesDepuisMenu()">📝 Notes & Consignes</button>
+        
+        <!-- BOUTON VIDER LE LOCAL STORAGE -->
+        <button class="sidebar-action-btn" onclick="viderLocalStorageApp()" style="color: #f87171;">🗑️ Vider le LocalStorage</button>
 
         <div style="padding: 15px 20px;">
             <label style="color: #9ca3af; font-size: 13px; display: block; margin-bottom: 8px; font-weight: bold;">🏗️ Choisir un chantier :</label>
@@ -202,6 +205,16 @@
 
     </div>
 
+    <!-- MODALE DIAGNOSTIC / LOGS (POUR VOIR POURQUOI LE CHANGEMENT ÉCHOUE) -->
+    <div id="divPopupDiagnostic" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+        <div class="bg-white p-5 rounded-xl shadow-2xl w-full max-w-md border-2 border-red-500">
+            <h3 class="font-bold text-base text-red-600 mb-2 flex items-center gap-2"><span>🔍</span> Diagnostic / Logs de Sélection</h3>
+            <p class="text-xs text-gray-600 mb-3">Voici le détail technique de ce qui a été tenté lors du scan ou du chargement :</p>
+            <div id="contenuLogsDiagnostic" class="bg-black text-green-400 font-mono text-xs p-3 rounded-lg max-h-48 overflow-y-auto mb-4 whitespace-pre-wrap"></div>
+            <button onclick="document.getElementById('divPopupDiagnostic').classList.add('hidden')" class="w-full bg-red-600 hover:bg-red-700 text-white p-2.5 rounded-lg font-bold text-sm">Fermer</button>
+        </div>
+    </div>
+
     <!-- MODALE SCANNER QR CODE CAMERA INTERNE -->
     <div id="divQRModal" class="hidden fixed inset-0 bg-black bg-opacity-80 flex flex-col items-center justify-center z-50 p-4">
         <div class="bg-white p-4 rounded-xl shadow-xl w-full max-w-md text-center relative">
@@ -274,6 +287,28 @@
         let actionEnCours = null;
         let qrStream = null;
         let qrScanInterval = null;
+        let logsDiagnosticGlobal = [];
+
+        function logDiag(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const ligne = `[${timestamp}] ${message}`;
+            logsDiagnosticGlobal.push(ligne);
+            console.log(ligne);
+        }
+
+        function afficherPopupDiagnostic(titreCustom = "Diagnostic des sélections") {
+            const conteneur = document.getElementById('contenuLogsDiagnostic');
+            conteneur.innerText = logsDiagnosticGlobal.join('\n');
+            document.getElementById('divPopupDiagnostic').classList.remove('hidden');
+        }
+
+        function viderLocalStorageApp() {
+            if (confirm("Voulez-vous vraiment vider tout le LocalStorage de l'application (cache et session) ?")) {
+                localStorage.clear();
+                alert("LocalStorage vidé avec succès. L'application va recharger.");
+                location.reload();
+            }
+        }
 
         // Gestion du réseau et de la file d'attente hors-ligne
         let estEnLigne = navigator.onLine;
@@ -334,19 +369,24 @@
         }
 
         async function chargerDonneesSupabase() {
+            logDiag("Début du chargement des données...");
             try {
                 if (estEnLigne) {
+                    logDiag("Mode en ligne : interrogation de Supabase (table: suivi_tx_cat)...");
                     const { data, error } = await supabaseClient
                         .from('suivi_tx_cat')
                         .select('*');
 
                     if (error) throw error;
                     rawData = data || [];
+                    logDiag(`Données reçues de Supabase : ${rawData.length} lignes.`);
                     localStorage.setItem('cache_suivi_sutx', JSON.stringify(rawData));
                 } else {
+                    logDiag("Mode hors-ligne : chargement depuis le cache local...");
                     chargerDonneesLocalesCache();
                 }
             } catch (err) {
+                logDiag(`⚠️ Erreur Supabase: ${err.message || err}. Bascule sur le cache local.`);
                 console.warn("Impossible de joindre Supabase, bascule sur le cache local :", err);
                 chargerDonneesLocalesCache();
             }
@@ -359,9 +399,14 @@
             if (cache) {
                 try {
                     rawData = JSON.parse(cache);
+                    logDiag(`Cache local chargé avec succès : ${rawData.length} lignes.`);
                 } catch (e) {
                     rawData = [];
+                    logDiag("❌ Erreur lors du parsing du cache local.");
                 }
+            } else {
+                logDiag("⚠️ Aucun cache local trouvé dans le LocalStorage.");
+                rawData = [];
             }
         }
 
@@ -371,20 +416,26 @@
             selectC.innerHTML = '<option value="">Choisir...</option>';
             
             const chantiers = [...new Set(rawData.map(r => r.Chantier))].filter(Boolean);
+            logDiag(`Chantiers uniques détectés (${chantiers.length}) : ${JSON.stringify(chantiers)}`);
+            
             chantiers.forEach(c => selectC.add(new Option(c, c)));
             
             if (valActuelle && chantiers.includes(valActuelle)) {
                 selectC.value = valActuelle;
                 document.getElementById('labelChantierActif').innerText = valActuelle;
+                logDiag(`Chantier actif conservé : ${valActuelle}`);
             } else if (chantiers.length > 0 && !valActuelle) {
-                // Sélection automatique du premier chantier par défaut si aucun n'est choisi
                 selectC.value = chantiers[0];
                 document.getElementById('labelChantierActif').innerText = chantiers[0];
+                logDiag(`Sélection automatique du premier chantier par défaut : ${chantiers[0]}`);
                 selectC.dispatchEvent(new Event('change'));
+            } else {
+                logDiag("⚠️ Aucun chantier n'a pu être sélectionné automatiquement.");
             }
         }
 
         window.addEventListener('DOMContentLoaded', () => {
+            logDiag("DOM chargé.");
             try {
                 if ('serviceWorker' in navigator) {
                     navigator.serviceWorker.register('sw.js').catch(() => {});
@@ -394,10 +445,13 @@
             mettreAJourBandeauReseau();
 
             if (userEmail && userName) {
+                logDiag(`Utilisateur déjà authentifié en cache : ${userName} (${userEmail})`);
                 document.getElementById('auth-nom').value = userName;
                 document.getElementById('auth-prenom').value = userPrenom;
                 document.getElementById('auth-email').value = userEmail;
                 verifierAccesEtLancer();
+            } else {
+                logDiag("Aucun utilisateur en cache, attente de connexion.");
             }
         });
 
@@ -408,6 +462,7 @@
             const statusText = document.getElementById('qrStatusText');
             modal.classList.remove('hidden');
             statusText.innerText = "Accès à la caméra en cours...";
+            logDiag("Ouverture de la caméra pour scan QR...");
 
             try {
                 qrStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
@@ -421,16 +476,19 @@
                         try {
                             const codes = await barcodeDetector.detect(video);
                             if (codes.length > 0) {
+                                logDiag(`QR Code détecté par caméra : "${codes[0].rawValue}"`);
                                 traiterTexteQR(codes[0].rawValue);
                             }
                         } catch (e) {}
                     }, 400);
                 } else {
-                    statusText.innerText = "⚠️ Scanner natif non supporté par ce navigateur. Entrez le support manuellement.";
+                    statusText.innerText = "⚠️ Scanner natif non supporté par ce navigateur.";
+                    logDiag("BarcodeDetector non supporté sur ce navigateur.");
                 }
             } catch (err) {
                 console.error("Erreur caméra :", err);
                 statusText.innerText = "❌ Impossible d'accéder à la caméra.";
+                logDiag(`Erreur d'accès caméra : ${err.message || err}`);
             }
         }
 
@@ -447,36 +505,54 @@
             fermerModalScanQR();
             let supportTrouve = texte.trim();
             let chantierTrouve = "";
+            logDiag(`Traitement du texte scanné : "${texte}"`);
 
-            // Format possible support|chantier ou direct support
             if (texte.includes('|')) {
                 const parts = texte.split('|');
                 chantierTrouve = parts[0].trim();
                 supportTrouve = parts[1].trim();
+                logDiag(`Format séparé détecté -> Chantier: "${chantierTrouve}" | Support: "${supportTrouve}"`);
+            } else {
+                logDiag(`Format simple détecté (support seul) -> Support: "${supportTrouve}"`);
             }
 
             if (chantierTrouve) {
-                document.getElementById('selectChantier').value = chantierTrouve;
-                document.getElementById('selectChantier').dispatchEvent(new Event('change'));
-                document.getElementById('labelChantierActif').innerText = chantierTrouve;
+                const selectC = document.getElementById('selectChantier');
+                const chantiersDispos = [...selectC.options].map(o => o.value);
+                if (chantiersDispos.includes(chantierTrouve)) {
+                    selectC.value = chantierTrouve;
+                    selectC.dispatchEvent(new Event('change'));
+                    document.getElementById('labelChantierActif').innerText = chantierTrouve;
+                    logDiag(`Chantier "${chantierTrouve}" appliqué avec succès.`);
+                } else {
+                    logDiag(`❌ ÉCHEC Chantier : Le chantier "${chantierTrouve}" n'existe pas dans la liste des options ! Options dispos : ${JSON.stringify(chantiersDispos)}`);
+                    afficherPopupDiagnostic();
+                    return;
+                }
             }
 
             const chantierActif = document.getElementById('selectChantier').value;
             if (!chantierActif) {
+                logDiag(`❌ ÉCHEC : Aucun chantier actif sélectionné avant de chercher le support.`);
                 alert(`QR Code scanné : "${supportTrouve}". Veuillez d'abord choisir un chantier.`);
                 basculerMenuParametres();
+                afficherPopupDiagnostic();
                 return;
             }
 
-            // Mettre à jour la liste des supports du chantier actif
             const supports = [...new Set(rawData.filter(r => r.Chantier === chantierActif).map(r => r.Support))].filter(Boolean);
+            logDiag(`Supports disponibles pour le chantier "${chantierActif}" (${supports.length}) : ${JSON.stringify(supports)}`);
             
             if (supports.includes(supportTrouve)) {
-                document.getElementById('selectSupport').value = supportTrouve;
-                document.getElementById('selectSupport').dispatchEvent(new Event('change'));
+                const selectS = document.getElementById('selectSupport');
+                selectS.value = supportTrouve;
+                selectS.dispatchEvent(new Event('change'));
                 document.getElementById('labelSupportActif').innerText = supportTrouve;
+                logDiag(`✅ Support "${supportTrouve}" trouvé et sélectionné avec succès !`);
             } else {
+                logDiag(`❌ ÉCHEC Support : Le support "${supportTrouve}" est introuvable dans le chantier "${chantierActif}". Vérifiez l'orthographe exacte ou la casse.`);
                 alert(`⚠️ Le support "${supportTrouve}" n'a pas été trouvé dans le chantier "${chantierActif}".`);
+                afficherPopupDiagnostic();
             }
         }
 
@@ -499,6 +575,7 @@
         function basculerMenuSupportsDroit() {
             const chantierActif = document.getElementById('selectChantier').value;
             if (!chantierActif) {
+                logDiag("Tentative d'ouverture des supports sans chantier actif.");
                 alert("Veuillez d'abord sélectionner un chantier.");
                 basculerMenuParametres();
                 return;
@@ -592,6 +669,7 @@
                     document.getElementById('selectChantier').value = c;
                     document.getElementById('selectChantier').dispatchEvent(new Event('change'));
                     document.getElementById('labelChantierActif').innerText = c;
+                    logDiag(`Chantier cliqué dans le menu : "${c}"`);
                     fermerToutesSidebars();
                 };
                 container.appendChild(btn);
@@ -628,6 +706,7 @@
                     document.getElementById('selectSupport').value = s;
                     document.getElementById('selectSupport').dispatchEvent(new Event('change'));
                     document.getElementById('labelSupportActif').innerText = s;
+                    logDiag(`Support cliqué dans le menu : "${s}"`);
                     fermerToutesSidebars();
                 };
                 container.appendChild(btn);
@@ -658,6 +737,7 @@
             localStorage.setItem('nomSutx', userName);
             localStorage.setItem('prenomSutx', userPrenom);
             localStorage.setItem('emailSutx', userEmail);
+            logDiag(`Tentative de connexion pour : ${emailInput}`);
 
             if (!estEnLigne) {
                 userAdmin = localStorage.getItem('adminSutx') === 'true';
@@ -693,6 +773,7 @@
                 if (!userRecord || userRecord.sutx !== true) {
                     errorEl.textContent = "❌ Accès non autorisé. Contactez l'administrateur.";
                     errorEl.classList.remove('hidden');
+                    logDiag("Accès refusé (sutx !== true).");
                     return;
                 }
 
@@ -702,6 +783,7 @@
                 lancerApplication();
             } catch (err) {
                 console.error("Erreur de connexion :", err);
+                logDiag(`Erreur connexion Supabase : ${err.message || err}`);
                 if (!estEnLigne) {
                     lancerApplication();
                 } else {
@@ -726,6 +808,7 @@
                     .maybeSingle();
 
                 if (error || !userRecord || userRecord.sutx !== true) {
+                    logDiag("Vérification d'accès échouée, retour au login.");
                     localStorage.clear();
                     document.getElementById('auth-overlay').classList.remove('hidden');
                     document.getElementById('main-app').classList.add('hidden');
@@ -737,11 +820,13 @@
                 lancerApplication();
             } catch (err) {
                 console.error("Erreur de vérification :", err);
+                logDiag(`Erreur vérification accès : ${err.message || err}`);
                 lancerApplication();
             }
         }
 
         function lancerApplication() {
+            logDiag("Lancement de l'application principal.");
             document.getElementById('auth-overlay').classList.add('hidden');
             document.getElementById('main-app').classList.remove('hidden');
             document.getElementById('headerInfo').querySelector('span').innerText = `👤 SUTX : ${userPrenom} ${userName}`;
@@ -894,6 +979,7 @@
             containerTaches.innerHTML = '';
             
             const chantierChoisi = selectChantier.value;
+            logDiag(`Événement change selectChantier déclenché : "${chantierChoisi}"`);
             if (!chantierChoisi) {
                 selectSupport.disabled = true;
                 return;
@@ -905,6 +991,7 @@
         });
 
         selectSupport.addEventListener('change', () => {
+            logDiag(`Événement change selectSupport déclenché : "${selectSupport.value}"`);
             document.getElementById('filtreTachesInput').value = '';
             rafraichirAffichageTaches();
         });
@@ -1010,6 +1097,7 @@
                 if (error) throw error;
             } catch (err) {
                 console.error("Erreur de mise à jour Supabase :", err);
+                logDiag(`Erreur update Supabase: ${err.message || err}`);
                 enregistrerFileAttenteModif();
             }
         }
@@ -1037,9 +1125,10 @@
                         .eq('id', item.id);
                 }
                 localStorage.removeItem('file_attente_sutx');
-                console.log("✅ Synchronisation des données hors-ligne réussie.");
+                logDiag("✅ Synchronisation des données hors-ligne réussie.");
             } catch (err) {
                 console.error("Erreur lors de la synchronisation :", err);
+                logDiag(`Erreur sync hors-ligne : ${err.message || err}`);
             }
         }
 
