@@ -81,7 +81,6 @@
 
         <button class="sidebar-action-btn" onclick="ouvrirFBMDepuisMenu()">🚧 Ouvrir FBM</button>
         <button class="sidebar-action-btn" onclick="ouvrirNotesGlobalesDepuisMenu()">📝 Notes & Consignes</button>
-        <button class="sidebar-action-btn" onclick="exporterExcelDepuisMenu()">📊 Exporter Excel / CSV</button>
 
         <div style="padding: 15px 20px;">
             <label style="color: #9ca3af; font-size: 13px; display: block; margin-bottom: 8px; font-weight: bold;">🏗️ Choisir un chantier :</label>
@@ -561,18 +560,6 @@
             localStorage.setItem(`notes_sutx_${chantierActif}`, notes);
             document.getElementById('divNotesModal').classList.add('hidden');
             alert("✅ Notes enregistrées localement avec succès.");
-        }
-
-        function exporterExcelDepuisMenu() {
-            fermerToutesSidebars();
-            if (rawData.length === 0) {
-                alert("Aucune donnée à exporter.");
-                return;
-            }
-            const worksheet = XLSX.utils.json_to_sheet(rawData);
-            const workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, "Suivi SUTX");
-            XLSX.writeFile(workbook, "Export_Suivi_SUTX.xlsx");
         }
 
         function changerUtilisateur() {
