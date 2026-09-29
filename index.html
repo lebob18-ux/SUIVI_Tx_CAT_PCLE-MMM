@@ -117,33 +117,23 @@
     <!-- CONTENU PRINCIPAL -->
     <div id="main-app" class="max-w-4xl mx-auto bg-white rounded-xl shadow-md p-6 hidden">
         
-        <!-- Barre supérieure simplifiée (Bouton hamburger supprimé, seul le titre / bouton menu latéral par les sélecteurs reste) -->
-        <div class="flex items-center justify-between mb-6 border-b pb-4">
-            <div class="flex items-center gap-3">
-                <h1 id="titrePageCourante" class="text-xl font-bold text-gray-800">📋 Saisie & Suivi</h1>
-            </div>
-        </div>
-
         <!-- ================= PAGE 1 : SAISIE ================= -->
         <div id="page1">
-            <div class="flex flex-wrap justify-between items-center mb-2 border-b pb-4 gap-2">
-                <h1 class="text-xl font-bold text-gray-800">📋 Suivi des Travaux</h1>
-                <div id="containerActions" class="hidden flex gap-2">
-                    <button id="btnCopier" onclick="copierTravaux()" class="bg-gray-800 hover:bg-gray-900 text-white px-3 py-2 rounded-lg font-bold text-sm shadow transition flex items-center gap-1.5">
-                        <span>📋</span> Copier
-                    </button>
-                    <button id="btnSharePDF" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg font-bold text-sm shadow transition flex items-center gap-1.5">
-                        <span>📄</span> Partager PDF
-                    </button>
-                </div>
+            <div id="containerActions" class="hidden flex gap-2 justify-end mb-4">
+                <button id="btnCopier" onclick="copierTravaux()" class="bg-gray-800 hover:bg-gray-900 text-white px-3 py-2 rounded-lg font-bold text-sm shadow transition flex items-center gap-1.5">
+                    <span>📋</span> Copier
+                </button>
+                <button id="btnSharePDF" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg font-bold text-sm shadow transition flex items-center gap-1.5">
+                    <span>📄</span> Partager PDF
+                </button>
             </div>
             
-            <div id="headerInfo" class="text-sm text-blue-700 mb-6 font-semibold bg-blue-50 p-2.5 rounded-lg border border-blue-100"></div>
+            <div id="headerInfo" class="text-sm text-blue-700 mb-4 font-semibold bg-blue-50 p-2.5 rounded-lg border border-blue-100"></div>
             
             <div class="grid grid-cols-2 gap-3 mb-4">
                 <button type="button" onclick="basculerMenuParametres()" class="p-2.5 border rounded-lg bg-blue-50 border-blue-200 text-left hover:bg-blue-100 transition">
-                    <span class="block text-xs font-bold uppercase text-gray-600 mb-0.5">🏗️ Chantier</span>
-                    <span id="labelChantierActif" class="block text-sm font-bold text-blue-700 truncate">Aucun chantier</span>
+                    <span class="block text-xs font-bold uppercase text-gray-600 mb-0.5">🏗️️ Chantier ▾</span>
+                    <span id="labelChantierActif" class="block text-sm font-bold text-blue-700 truncate">Choisir chantier</span>
                 </button>
                 <button type="button" onclick="basculerMenuSupportsDroit()" class="p-2.5 border rounded-lg bg-blue-50 border-blue-200 text-left hover:bg-blue-100 transition">
                     <span class="block text-xs font-bold uppercase text-gray-600 mb-0.5">📍 Support ▾</span>
@@ -232,7 +222,7 @@
     </div>
 
     <script>
-        /*================ CONFIGURATION SUPABASE =================*/
+        /* ================= CONFIGURATION SUPABASE ================= -->
         const SUPABASE_URL = "https://thbqkeugjvsxbryfnzuo.supabase.co";
         const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
 
@@ -245,6 +235,32 @@
         let userPrenom = localStorage.getItem('prenomSutx') || "";
         let userAdmin = false;
         let actionEnCours = null;
+
+        // Fonction de chargement des données depuis Supabase restaurée et assurée au démarrage
+        async function chargerDonneesSupabase() {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('suivi_tx_cat')
+                    .select('*');
+
+                if (error) throw error;
+                rawData = data || [];
+                
+                // Mettre à jour automatiquement le select caché des chantiers
+                const selectC = document.getElementById('selectChantier');
+                const valActuelle = selectC.value;
+                selectC.innerHTML = '<option value="">Choisir...</option>';
+                
+                const chantiers = [...new Set(rawData.map(r => r.Chantier))].filter(Boolean);
+                chantiers.forEach(c => selectC.add(new Option(c, c)));
+                
+                if (valActuelle && chantiers.includes(valActuelle)) {
+                    selectC.value = valActuelle;
+                }
+            } catch (err) {
+                console.error("Erreur chargement données:", err);
+            }
+        }
 
         window.addEventListener('DOMContentLoaded', () => {
             try {
@@ -261,7 +277,7 @@
             }
         });
 
-        /* ================= GESTION DES MENUS LATÉRAUX (SIDEBARS) ================= */
+        /* ================= GESTION DES MENUS LATÉRAUX (SIDEBARS) ================= -->
         function basculerMenuParametres() {
             const menu = document.getElementById('menuParametres');
             const backdrop = document.getElementById('sidebarBackdrop');
@@ -506,12 +522,10 @@
             const page2 = document.getElementById('page2');
             const btnSaisie = document.getElementById('btnMenuSaisie');
             const btnAdmin = document.getElementById('btnMenuAdmin');
-            const titrePage = document.getElementById('titrePageCourante');
 
             if (numPage === 1) {
                 page1.classList.remove('hidden');
                 page2.classList.add('hidden');
-                titrePage.innerText = "📋 Saisie & Suivi";
                 btnSaisie.style.background = "#2563eb";
                 btnSaisie.style.color = "#fff";
                 btnAdmin.style.background = "#333";
@@ -519,7 +533,6 @@
             } else {
                 page1.classList.add('hidden');
                 page2.classList.remove('hidden');
-                titrePage.innerText = "📊 Avancement Chantiers";
                 btnAdmin.style.background = "#2563eb";
                 btnAdmin.style.color = "#fff";
                 btnSaisie.style.background = "#333";
