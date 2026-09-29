@@ -63,6 +63,9 @@
 </head>
 <body class="bg-gray-100 p-4 min-h-screen text-gray-800">
 
+    <!-- BANDEAU DE STATUT RÉSEAU -->
+    <div id="network-status" class="max-w-4xl mx-auto mb-3 hidden p-2 rounded-lg text-xs font-bold text-center transition-colors"></div>
+
     <!-- FOND ASSOMBRI CLIQUABLE POUR FERMER LES MENUS -->
     <div id="sidebarBackdrop" class="sidebar-backdrop" onclick="fermerToutesSidebars()"></div>
 
@@ -207,7 +210,7 @@
     <div id="divAjoutTacheModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
         <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-sm">
             <p class="font-bold text-lg mb-2 text-gray-800 text-center">➕ Ajouter un travail non prévu</p>
-            <p class="text-xs text-gray-600 mb-4 text-center">Ce travail sera enregistré directement dans Supabase.</p>
+            <p class="text-xs text-gray-600 mb-4 text-center">Ce travail sera enregistré localement et synchronisé dès le retour du réseau.</p>
             <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Intitulé de la tâche :</label>
             <input type="text" id="inputNouvelleTache" placeholder="Ex: Reprise fondation spécifique..." class="w-full p-2.5 border rounded-lg mb-4 text-sm focus:ring-2 focus:ring-blue-500">
             <div class="flex gap-2">
@@ -245,6 +248,33 @@
         let userAdmin = false;
         let actionEnCours = null;
 
+        // Gestion du réseau et de la file d'attente hors-ligne
+        let estEnLigne = navigator.onLine;
+
+        window.addEventListener('online', () => {
+            estEnLigne = true;
+            mettreAJourBandeauReseau();
+            verifierEtSynchroniserFileAttente();
+        });
+
+        window.addEventListener('offline', () => {
+            estEnLigne = false;
+            mettreAJourBandeauReseau();
+        });
+
+        function mettreAJourBandeauReseau() {
+            const bandeau = document.getElementById('network-status');
+            bandeau.classList.remove('hidden');
+            if (estEnLigne) {
+                bandeau.className = "max-w-4xl mx-auto mb-3 p-2 rounded-lg text-xs font-bold text-center bg-green-100 text-green-800";
+                bandeau.innerText = "🌐 Connexion rétablie - Synchronisation en cours...";
+                setTimeout(() => bandeau.classList.add('hidden'), 3500);
+            } else {
+                bandeau.className = "max-w-4xl mx-auto mb-3 p-2 rounded-lg text-xs font-bold text-center bg-amber-100 text-amber-800";
+                bandeau.innerText = "⚠️ Mode Hors-Ligne : Vos modifications sont enregistrées localement sur votre appareil.";
+            }
+        }
+
         // Gestion du balayage tactile (Swipe)
         let touchStartX = 0;
         let touchEndX = 0;
@@ -278,25 +308,46 @@
 
         async function chargerDonneesSupabase() {
             try {
-                const { data, error } = await supabaseClient
-                    .from('suivi_tx_cat')
-                    .select('*');
+                if (estEnLigne) {
+                    const { data, error } = await supabaseClient
+                        .from('suivi_tx_cat')
+                        .select('*');
 
-                if (error) throw error;
-                rawData = data || [];
-                
-                const selectC = document.getElementById('selectChantier');
-                const valActuelle = selectC.value;
-                selectC.innerHTML = '<option value="">Choisir...</option>';
-                
-                const chantiers = [...new Set(rawData.map(r => r.Chantier))].filter(Boolean);
-                chantiers.forEach(c => selectC.add(new Option(c, c)));
-                
-                if (valActuelle && chantiers.includes(valActuelle)) {
-                    selectC.value = valActuelle;
+                    if (error) throw error;
+                    rawData = data || [];
+                    localStorage.setItem('cache_suivi_sutx', JSON.stringify(rawData));
+                } else {
+                    chargerDonneesLocalesCache();
                 }
             } catch (err) {
-                console.error("Erreur chargement données:", err);
+                console.warn("Impossible de joindre Supabase, bascule sur le cache local :", err);
+                chargerDonneesLocalesCache();
+            }
+
+            initialiserSelecteursChantiers();
+        }
+
+        function chargerDonneesLocalesCache() {
+            const cache = localStorage.getItem('cache_suivi_sutx');
+            if (cache) {
+                try {
+                    rawData = JSON.parse(cache);
+                } catch (e) {
+                    rawData = [];
+                }
+            }
+        }
+
+        function initialiserSelecteursChantiers() {
+            const selectC = document.getElementById('selectChantier');
+            const valActuelle = selectC.value;
+            selectC.innerHTML = '<option value="">Choisir...</option>';
+            
+            const chantiers = [...new Set(rawData.map(r => r.Chantier))].filter(Boolean);
+            chantiers.forEach(c => selectC.add(new Option(c, c)));
+            
+            if (valActuelle && chantiers.includes(valActuelle)) {
+                selectC.value = valActuelle;
             }
         }
 
@@ -306,6 +357,8 @@
                     navigator.serviceWorker.register('sw.js').catch(() => {});
                 }
             } catch (e) {}
+
+            mettreAJourBandeauReseau();
 
             if (userEmail && userName) {
                 document.getElementById('auth-nom').value = userName;
@@ -493,6 +546,21 @@
                 return;
             }
 
+            userName = nomInput;
+            userPrenom = prenomInput;
+            userEmail = emailInput;
+
+            localStorage.setItem('nomSutx', userName);
+            localStorage.setItem('prenomSutx', userPrenom);
+            localStorage.setItem('emailSutx', userEmail);
+
+            if (!estEnLigne) {
+                // Mode hors-ligne : on valide par défaut si les infos sont déjà en cache ou validées avant
+                userAdmin = localStorage.getItem('adminSutx') === 'true';
+                lancerApplication();
+                return;
+            }
+
             try {
                 let { data: userRecord, error: searchError } = await supabaseClient
                     .from('app_bob')
@@ -524,24 +592,29 @@
                     return;
                 }
 
-                userName = nomInput;
-                userPrenom = prenomInput;
-                userEmail = emailInput;
                 userAdmin = userRecord.admin === true;
-
-                localStorage.setItem('nomSutx', userName);
-                localStorage.setItem('prenomSutx', userPrenom);
-                localStorage.setItem('emailSutx', userEmail);
+                localStorage.setItem('adminSutx', userAdmin);
 
                 lancerApplication();
             } catch (err) {
                 console.error("Erreur de connexion :", err);
-                errorEl.textContent = `❌ Erreur : ${err.message || "Erreur de connexion."}`;
-                errorEl.classList.remove('hidden');
+                // Si échec réseau pendant l'authentification, on autorise si déjà connu en cache local
+                if (!estEnLigne) {
+                    lancerApplication();
+                } else {
+                    errorEl.textContent = `❌ Erreur : ${err.message || "Erreur de connexion."}`;
+                    errorEl.classList.remove('hidden');
+                }
             }
         }
 
         async function verifierAccesEtLancer() {
+            if (!estEnLigne) {
+                userAdmin = localStorage.getItem('adminSutx') === 'true';
+                lancerApplication();
+                return;
+            }
+
             try {
                 const { data: userRecord, error } = await supabaseClient
                     .from('app_bob')
@@ -557,9 +630,11 @@
                 }
 
                 userAdmin = userRecord.admin === true;
+                localStorage.setItem('adminSutx', userAdmin);
                 lancerApplication();
             } catch (err) {
                 console.error("Erreur de vérification :", err);
+                lancerApplication();
             }
         }
 
@@ -737,7 +812,7 @@
                     rawData[i].Fait = etatVoulu;
                     rawData[i].modifie = true;
 
-                    if (rawData[i].id) {
+                    if (rawData[i].id && estEnLigne) {
                         try {
                             await supabaseClient
                                 .from('suivi_tx_cat')
@@ -750,16 +825,22 @@
                 }
             }
 
+            sauvegarderCacheLocal();
+            if (!estEnLigne) enregistrerFileAttenteModif();
             rafraichirAffichageTaches();
         }
 
         async function modifierLigne(index, champ, valeur) {
             rawData[index][champ] = valeur;
             rawData[index].modifie = true;
+            sauvegarderCacheLocal();
             rafraichirAffichageTaches();
 
             const ligne = rawData[index];
-            if (!ligne.id) return;
+            if (!ligne.id || !estEnLigne) {
+                enregistrerFileAttenteModif();
+                return;
+            }
 
             try {
                 const updateData = {};
@@ -773,7 +854,36 @@
                 if (error) throw error;
             } catch (err) {
                 console.error("Erreur de mise à jour Supabase :", err);
-                alert("❌ Erreur lors de l'enregistrement en base de données.");
+                enregistrerFileAttenteModif();
+            }
+        }
+
+        function sauvegarderCacheLocal() {
+            localStorage.setItem('cache_suivi_sutx', JSON.stringify(rawData));
+        }
+
+        function enregistrerFileAttenteModif() {
+            let fileAttente = JSON.parse(localStorage.getItem('file_attente_sutx') || '[]');
+            fileAttente.push({ timestamp: Date.now(), data: rawData.filter(r => r.modifie) });
+            localStorage.setItem('file_attente_sutx', JSON.stringify(fileAttente));
+        }
+
+        async function verifierEtSynchroniserFileAttente() {
+            const fileAttenteStr = localStorage.getItem('file_attente_sutx');
+            if (!fileAttenteStr || !estEnLigne) return;
+
+            try {
+                const elementsModifies = rawData.filter(r => r.modifie === true && r.id);
+                for (const item of elementsModifies) {
+                    await supabaseClient
+                        .from('suivi_tx_cat')
+                        .update({ Fait: item.Fait, Observation: item.Observation })
+                        .eq('id', item.id);
+                }
+                localStorage.removeItem('file_attente_sutx');
+                console.log("✅ Synchronisation des données hors-ligne réussie.");
+            } catch (err) {
+                console.error("Erreur lors de la synchronisation :", err);
             }
         }
 
@@ -792,32 +902,44 @@
                 return;
             }
 
-            try {
-                const nouvelleLigne = {
-                    Chantier: chantierChoisi,
-                    Support: supportChoisi,
-                    Tache: intitule,
-                    Fait: true,
-                    Observation: "Travail non prévu ajouté manuellement"
-                };
+            const nouvelleLigne = {
+                Chantier: chantierChoisi,
+                Support: supportChoisi,
+                Tache: intitule,
+                Fait: true,
+                Observation: "Travail non prévu ajouté manuellement",
+                modifie: true,
+                isCustom: true
+            };
 
-                const { data, error } = await supabaseClient
-                    .from('suivi_tx_cat')
-                    .insert([nouvelleLigne])
-                    .select();
+            if (estEnLigne) {
+                try {
+                    const { data, error } = await supabaseClient
+                        .from('suivi_tx_cat')
+                        .insert([{
+                            Chantier: chantierChoisi,
+                            Support: supportChoisi,
+                            Tache: intitule,
+                            Fait: true,
+                            Observation: "Travail non prévu ajouté manuellement"
+                        }])
+                        .select();
 
-                if (error) throw error;
-
-                if (data && data.length > 0) {
-                    rawData.push({ ...data[0], modifie: true, isCustom: true });
+                    if (error) throw error;
+                    if (data && data.length > 0) {
+                        nouvelleLigne.id = data[0].id;
+                    }
+                } catch (err) {
+                    console.error("Erreur insertion en ligne, sauvegarde locale :", err);
                 }
-
-                document.getElementById('divAjoutTacheModal').classList.add('hidden');
-                rafraichirAffichageTaches();
-            } catch (err) {
-                console.error("Erreur d'insertion :", err);
-                alert("❌ Erreur lors de l'ajout de la tâche.");
             }
+
+            rawData.push(nouvelleLigne);
+            sauvegarderCacheLocal();
+            if (!estEnLigne) enregistrerFileAttenteModif();
+
+            document.getElementById('divAjoutTacheModal').classList.add('hidden');
+            rafraichirAffichageTaches();
         }
 
         function copierTravaux() {
@@ -914,7 +1036,7 @@
 
             const tableColumns = ["ID", "Chantier", "Support", "Tache", "Fait", "Observation"];
             const tableRows = elementsModifies.map(r => [
-                r.id || "SANS ID", r.Chantier, r.Support, r.Tache, r.Fait ? "Oui" : "Non", r.Observation
+                r.id || "HORS-LIGNE", r.Chantier, r.Support, r.Tache, r.Fait ? "Oui" : "Non", r.Observation
             ]);
 
             doc.autoTable({
@@ -972,14 +1094,14 @@
                 return [chantier, faites, total, `${pct}%`];
             });
 
-    doc.autoTable({
-        startY: 45,
-        head: [tableColumns],
-        body: tableRows,
-        theme: 'grid',
-        headStyles: { fillColor: [37, 99, 235], textColor: [255, 255, 255] },
-        styles: { fontSize: 10, cellPadding: 4 }
-    });
+            doc.autoTable({
+                startY: 45,
+                head: [tableColumns],
+                body: tableRows,
+                theme: 'grid',
+                headStyles: { fillColor: [37, 99, 235], textColor: [255, 255, 255] },
+                styles: { fontSize: 10, cellPadding: 4 }
+            });
 
             const pdfOutput = doc.output('blob');
             const fileName = `Avancement_Chantiers.pdf`;
