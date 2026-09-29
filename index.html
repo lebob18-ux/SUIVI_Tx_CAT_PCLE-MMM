@@ -25,7 +25,7 @@
 
         /* Sidebar GAUCHE (menu / chantiers) */
         .sidebar { height:100%; width:0; position:fixed; z-index:1000; top:0; left:0; background-color:#111;
-            overflow-x:hidden; overflow-y:auto; transition:width 0.25s ease; padding-top:60px; padding-bottom:120px;
+            overflow-x:hidden; overflow-y:auto; transition:width 0.25s ease; padding-top:20px; padding-bottom:120px;
             box-shadow:2px 0 5px rgba(0,0,0,0.5); max-width: 85vw; }
         .sidebar.open { width: 300px; }
         .sidebar button.sidebar-action-btn { padding:12px 20px; font-size:15px; color:#9ca3af; display:block;
@@ -73,6 +73,7 @@
     <div id="menuParametres" class="sidebar">
         <button class="btn-fermer" onclick="basculerMenuParametres()">&times;</button>
 
+        <!-- Boutons Saisie / Admin en haut -->
         <div style="padding: 10px 20px 15px 20px; display: flex; gap: 8px; border-bottom: 1px solid #222; margin-bottom: 10px;">
             <button id="btnMenuSaisie" onclick="changerOnglet(1); fermerToutesSidebars();" style="flex: 1; padding: 10px; font-size: 13px; font-weight: bold; background: #2563eb; color: #fff; border: none; border-radius: 6px; cursor: pointer; transition: 0.2s;">Saisie</button>
             <button id="btnMenuAdmin" onclick="changerOnglet(2); fermerToutesSidebars();" style="flex: 1; padding: 10px; font-size: 13px; font-weight: bold; background: #333; color: #aaa; border: none; border-radius: 6px; cursor: pointer; display: none; transition: 0.2s;">Admin</button>
@@ -178,17 +179,19 @@
             </div>
         </div>
 
-        <!-- PAGE 2 : AVANCEMENT CHANTIERS -->
+        <!-- PAGE 2 : ADMIN (RÉCAPITULATIF HIÉRARCHIQUE) -->
         <div id="page2" class="hidden">
             <div class="flex justify-between items-center mb-4 border-b pb-4">
-                <h2 class="text-xl font-bold text-gray-800">📊 Avancement Global des Chantiers</h2>
+                <h2 class="text-xl font-bold text-gray-800">📊 Récapitulatif Admin & Avancement</h2>
                 <button onclick="partagerPDFAvancement()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold shadow transition flex items-center gap-2 text-sm">
                     <span>📲</span> Partager PDF Avancement
                 </button>
             </div>
-            <div id="conteneurAvancement" class="space-y-4">
-                <p class="text-gray-500 text-sm italic text-center py-4">Chargement de l'avancement...</p>
-            </div>
+            
+            <p class="text-xs text-gray-500 mb-4">Cliquez sur un chantier pour voir ses supports, puis sur un support pour consulter le détail des travaux réalisés.</p>
+
+            <!-- Conteneur Hiérarchique Admin -->
+            <div id="conteneurAdminHierarchique" class="space-y-3"></div>
         </div>
 
     </div>
@@ -416,7 +419,12 @@
 
         function ouvrirFBMDepuisMenu() {
             fermerToutesSidebars();
-            ouvrirFBM();
+            const supportChoisi = selectSupport.value;
+            let urlFBM = "https://lebob18-ux.github.io/SUIVI_FBM/";
+            if (supportChoisi) {
+                urlFBM += `?support=${encodeURIComponent(supportChoisi)}`;
+            }
+            window.open(urlFBM, '_blank');
         }
 
         function actionCopierDepuisMenu() {
@@ -555,7 +563,6 @@
             localStorage.setItem('emailSutx', userEmail);
 
             if (!estEnLigne) {
-                // Mode hors-ligne : on valide par défaut si les infos sont déjà en cache ou validées avant
                 userAdmin = localStorage.getItem('adminSutx') === 'true';
                 lancerApplication();
                 return;
@@ -598,7 +605,6 @@
                 lancerApplication();
             } catch (err) {
                 console.error("Erreur de connexion :", err);
-                // Si échec réseau pendant l'authentification, on autorise si déjà connu en cache local
                 if (!estEnLigne) {
                     lancerApplication();
                 } else {
@@ -677,12 +683,13 @@
                 btnAdmin.style.color = "#fff";
                 btnSaisie.style.background = "#333";
                 btnSaisie.style.color = "#aaa";
-                calculerEtAfficherAvancement();
+                construireVueAdminHierarchique();
             }
         }
 
-        function calculerEtAfficherAvancement() {
-            const conteneur = document.getElementById('conteneurAvancement');
+        /* ================= VUE ADMIN HIÉRARCHIQUE ================= */
+        function construireVueAdminHierarchique() {
+            const conteneur = document.getElementById('conteneurAdminHierarchique');
             conteneur.innerHTML = '';
 
             const chantiers = [...new Set(rawData.map(r => r.Chantier))].filter(Boolean);
@@ -698,18 +705,80 @@
                 const tachesFaites = lignesChantier.filter(r => ['vrai', 'true', '1'].includes(String(r.Fait).toLowerCase().trim())).length;
                 const pourcentage = totalTaches > 0 ? Math.round((tachesFaites / totalTaches) * 100) : 0;
 
-                const divChantier = document.createElement('div');
-                divChantier.className = "bg-gray-50 p-4 border rounded-lg shadow-sm";
-                divChantier.innerHTML = `
-                    <div class="flex justify-between items-center mb-2">
-                        <span class="font-bold text-gray-800">${chantier}</span>
-                        <span class="text-sm font-semibold text-blue-600">${tachesFaites} / ${totalTaches} (${pourcentage}%)</span>
+                const cardChantier = document.createElement('div');
+                cardChantier.className = "bg-white border rounded-xl shadow-sm overflow-hidden mb-3";
+                
+                const headerChantier = document.createElement('div');
+                headerChantier.className = "p-4 bg-gray-50 hover:bg-blue-50 cursor-pointer flex justify-between items-center transition";
+                headerChantier.innerHTML = `
+                    <div>
+                        <span class="font-bold text-gray-800 text-base">🏗️ ${chantier}</span>
+                        <div class="text-xs text-gray-500 mt-1">${tachesFaites} / ${totalTaches} tâches validées (${pourcentage}%)</div>
                     </div>
-                    <div class="w-full bg-gray-200 rounded-full h-3">
-                        <div class="bg-blue-600 h-3 rounded-full transition-all duration-500" style="width: ${pourcentage}%"></div>
+                    <div class="flex items-center gap-3">
+                        <div class="w-24 bg-gray-200 rounded-full h-2.5 hidden sm:block">
+                            <div class="bg-blue-600 h-2.5 rounded-full" style="width: ${pourcentage}%"></div>
+                        </div>
+                        <span class="text-xs font-bold text-blue-600 bg-blue-100 px-2.5 py-1 rounded-full">📁 Déplier ▾</span>
                     </div>
                 `;
-                conteneur.appendChild(divChantier);
+
+                const contenuSupports = document.createElement('div');
+                contenuSupports.className = "hidden p-4 border-t bg-gray-50/50 space-y-3";
+
+                // Récupérer les supports de ce chantier
+                const supports = [...new Set(lignesChantier.map(r => r.Support))].filter(Boolean);
+                
+                supports.forEach(support => {
+                    const lignesSupport = lignesChantier.filter(r => r.Support === support);
+                    const totalSup = lignesSupport.length;
+                    const faitesSup = lignesSupport.filter(r => ['vrai', 'true', '1'].includes(String(r.Fait).toLowerCase().trim())).length;
+                    const pctSup = totalSup > 0 ? Math.round((faitesSup / totalSup) * 100) : 0;
+
+                    const cardSupport = document.createElement('div');
+                    cardSupport.className = "bg-white border rounded-lg overflow-hidden shadow-2xs";
+
+                    const headerSupport = document.createElement('div');
+                    headerSupport.className = "p-3 hover:bg-gray-100 cursor-pointer flex justify-between items-center text-sm font-semibold text-gray-700";
+                    headerSupport.innerHTML = `
+                        <span>📍 Support : ${support}</span>
+                        <span class="text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full font-bold">${faitesSup}/${totalSup} (${pctSup}%) ▾</span>
+                    `;
+
+                    const detailsTravaux = document.createElement('div');
+                    detailsTravaux.className = "hidden p-3 border-t bg-white text-xs space-y-2";
+
+                    lignesSupport.forEach(tache => {
+                        const estFait = ['vrai', 'true', '1'].includes(String(tache.Fait).toLowerCase().trim());
+                        const ligneItem = document.createElement('div');
+                        ligneItem.className = `p-2 rounded border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1 ${estFait ? 'bg-green-50/50 border-green-200' : 'bg-gray-50 border-gray-200'}`;
+                        ligneItem.innerHTML = `
+                            <div class="flex items-center gap-2">
+                                <span>${estFait ? '✅' : '❌'}</span>
+                                <span class="font-medium text-gray-800">${tache.Tache}</span>
+                            </div>
+                            <span class="text-gray-500 italic">Obs : ${tache.Observation || 'Aucune'}</span>
+                        `;
+                        detailsTravaux.appendChild(ligneItem);
+                    });
+
+                    headerSupport.onclick = (e) => {
+                        e.stopPropagation();
+                        detailsTravaux.classList.toggle('hidden');
+                    };
+
+                    cardSupport.appendChild(headerSupport);
+                    cardSupport.appendChild(detailsTravaux);
+                    contenuSupports.appendChild(cardSupport);
+                });
+
+                headerChantier.onclick = () => {
+                    contenuSupports.classList.toggle('hidden');
+                };
+
+                cardChantier.appendChild(headerChantier);
+                cardChantier.appendChild(contenuSupports);
+                conteneur.appendChild(cardChantier);
             });
         }
 
@@ -790,15 +859,6 @@
             sectionTachesSupport.classList.remove('hidden');
             sectionActionsRapides.classList.remove('hidden');
             sectionFiltreTaches.classList.remove('hidden');
-        }
-
-        function ouvrirFBM() {
-            const supportChoisi = selectSupport.value;
-            let urlFBM = "https://lebob18-ux.github.io/SUIVI_FBM/";
-            if (supportChoisi) {
-                urlFBM += `?support=${encodeURIComponent(supportChoisi)}`;
-            }
-            window.open(urlFBM, '_blank');
         }
 
         async function cocherToutSupport(etatVoulu) {
