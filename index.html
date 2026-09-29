@@ -28,11 +28,11 @@
             overflow-x:hidden; overflow-y:auto; transition:width 0.25s ease; padding-top:60px; padding-bottom:120px;
             box-shadow:2px 0 5px rgba(0,0,0,0.5); max-width: 85vw; }
         .sidebar.open { width: 300px; }
-        .sidebar button.sidebar-action-btn { padding:12px 20px; font-size:16px; color:#818181; display:block;
+        .sidebar button.sidebar-action-btn { padding:12px 20px; font-size:15px; color:#9ca3af; display:block;
             background:none; border:none; width:100%; text-align:left; cursor:pointer; transition:0.2s; }
-        .sidebar button.sidebar-action-btn:hover { color:#f1f1f1; background-color:#222; }
+        .sidebar button.sidebar-action-btn:hover { color:#f9fafb; background-color:#1f2937; }
         .sidebar .btn-fermer { position:absolute; top:15px; right:20px; font-size:30px; width:auto;
-            color:#818181; background:none; border:none; cursor:pointer; }
+            color:#9ca3af; background:none; border:none; cursor:pointer; }
 
         /* Sidebar DROITE (supports) */
         .sidebar-right { height:100%; width:0; position:fixed; z-index:1000; top:0; right:0; background-color:#111;
@@ -40,7 +40,7 @@
             box-shadow:-2px 0 5px rgba(0,0,0,0.5); max-width: 85vw; }
         .sidebar-right.open { width: 300px; }
         .sidebar-right .btn-fermer-droit { position:absolute; top:15px; left:20px; font-size:30px; width:auto;
-            color:#818181; background:none; border:none; cursor:pointer; }
+            color:#9ca3af; background:none; border:none; cursor:pointer; }
 
         /* Boutons fixes en bas des sidebars */
         .sidebar-fixed-footer { position:fixed; bottom:0; width:0; overflow:hidden; background-color:#1a1a1a;
@@ -55,9 +55,13 @@
             white-space:nowrap; }
         .sidebar-fixed-footer button + button { border-top:1px solid #1d4ed8; }
         .sidebar-fixed-footer button:hover { background-color:#1d4ed8; }
+
+        /* Style transitions douces */
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
-<body class="bg-gray-100 p-4 min-h-screen">
+<body class="bg-gray-100 p-4 min-h-screen text-gray-800">
 
     <!-- FOND ASSOMBRI CLIQUABLE POUR FERMER LES MENUS -->
     <div id="sidebarBackdrop" class="sidebar-backdrop" onclick="fermerToutesSidebars()"></div>
@@ -72,14 +76,16 @@
         </div>
 
         <button class="sidebar-action-btn" onclick="ouvrirFBMDepuisMenu()">🚧 Ouvrir FBM</button>
+        <button class="sidebar-action-btn" onclick="ouvrirNotesGlobalesDepuisMenu()">📝 Notes & Consignes</button>
+        <button class="sidebar-action-btn" onclick="exporterExcelDepuisMenu()">📊 Exporter Excel / CSV</button>
 
         <div style="padding: 15px 20px;">
-            <label style="color: #aaa; font-size: 13px; display: block; margin-bottom: 8px; font-weight: bold;">🏗️ Choisir un chantier :</label>
+            <label style="color: #9ca3af; font-size: 13px; display: block; margin-bottom: 8px; font-weight: bold;">🏗️ Choisir un chantier :</label>
             <div id="sidebarChantiersContainer" style="display: flex; flex-direction: column; gap: 6px;"></div>
         </div>
 
         <div id="footerGauche" class="sidebar-fixed-footer">
-            <button onclick="actionCopierDepuisMenu()">📋 Copier</button>
+            <button onclick="actionCopierDepuisMenu()">📋 Copier Récap</button>
             <button onclick="actionPartagerPDFDepuisMenu()">📄 Partager PDF</button>
         </div>
     </div>
@@ -114,18 +120,21 @@
     </div>
 
     <!-- CONTENU PRINCIPAL -->
-    <div id="main-app" class="max-w-4xl mx-auto bg-white rounded-xl shadow-md p-6 hidden">
+    <div id="main-app" class="max-w-4xl mx-auto bg-white rounded-xl shadow-md p-6 hidden fade-in">
         
         <!-- PAGE 1 : SAISIE -->
         <div id="page1">
-            <div id="headerInfo" class="text-sm text-blue-700 mb-4 font-semibold bg-blue-50 p-2.5 rounded-lg border border-blue-100"></div>
+            <div id="headerInfo" class="text-sm text-blue-700 mb-4 font-semibold bg-blue-50 p-2.5 rounded-lg border border-blue-100 flex justify-between items-center">
+                <span>👤 SUTX</span>
+                <button onclick="changerUtilisateur()" class="text-xs bg-white border border-blue-200 px-2 py-1 rounded text-blue-600 hover:bg-blue-100 transition">Changer</button>
+            </div>
             
             <div class="grid grid-cols-2 gap-3 mb-4">
-                <button type="button" onclick="basculerMenuParametres()" class="p-2.5 border rounded-lg bg-blue-50 border-blue-200 text-left hover:bg-blue-100 transition">
+                <button type="button" onclick="basculerMenuParametres()" class="p-2.5 border rounded-lg bg-blue-50 border-blue-200 text-left hover:bg-blue-100 transition shadow-sm">
                     <span class="block text-xs font-bold uppercase text-gray-600 mb-0.5">🏗 Chantier ▾</span>
                     <span id="labelChantierActif" class="block text-sm font-bold text-blue-700 truncate">Choisir chantier</span>
                 </button>
-                <button type="button" onclick="basculerMenuSupportsDroit()" class="p-2.5 border rounded-lg bg-blue-50 border-blue-200 text-left hover:bg-blue-100 transition">
+                <button type="button" onclick="basculerMenuSupportsDroit()" class="p-2.5 border rounded-lg bg-blue-50 border-blue-200 text-left hover:bg-blue-100 transition shadow-sm">
                     <span class="block text-xs font-bold uppercase text-gray-600 mb-0.5">📍 Support ▾</span>
                     <span id="labelSupportActif" class="block text-sm font-bold text-blue-700 truncate">-- Choisir support --</span>
                 </button>
@@ -136,13 +145,23 @@
                 <select id="selectSupport" disabled><option value="">Choisir...</option></select>
             </div>
 
-            <div id="sectionActionsRapides" class="hidden flex flex-wrap gap-2 mb-4">
-                <button onclick="cocherToutSupport(true)" class="bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1">
-                    <span>✅</span> Tout cocher sur ce support
-                </button>
-                <button onclick="cocherToutSupport(false)" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1">
-                    <span>❌</span> Tout décocher sur ce support
-                </button>
+            <div id="sectionActionsRapides" class="hidden flex flex-wrap items-center justify-between gap-2 mb-4 bg-gray-50 p-3 rounded-lg border">
+                <div class="flex flex-wrap gap-2">
+                    <button onclick="cocherToutSupport(true)" class="bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1">
+                        <span>✅</span> Tout cocher
+                    </button>
+                    <button onclick="cocherToutSupport(false)" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1">
+                        <span>❌</span> Tout décocher
+                    </button>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span id="badgeProgressionSupport" class="text-xs font-bold bg-blue-600 text-white px-2.5 py-1 rounded-full">0 / 0 (0%)</span>
+                </div>
+            </div>
+
+            <!-- Barre de filtre des tâches du support -->
+            <div id="sectionFiltreTaches" class="hidden mb-3">
+                <input type="text" id="filtreTachesInput" placeholder="Filtrer les tâches de ce support..." oninput="rafraichirAffichageTaches()" class="w-full p-2 text-xs border rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500">
             </div>
 
             <div id="sectionTachesSupport" class="hidden space-y-3">
@@ -198,6 +217,19 @@
         </div>
     </div>
 
+    <!-- Modale Notes & Consignes -->
+    <div id="divNotesModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-md">
+            <p class="font-bold text-lg mb-2 text-gray-800 text-center">📝 Notes & Consignes de Chantier</p>
+            <p class="text-xs text-gray-600 mb-3 text-center">Consignez ici les informations utiles pour l'équipe (sauvegardées localement).</p>
+            <textarea id="textareaNotes" rows="6" placeholder="Rédiger vos consignes ici..." class="w-full p-3 border rounded-lg mb-4 text-sm focus:ring-2 focus:ring-blue-500"></textarea>
+            <div class="flex gap-2">
+                <button onclick="sauvegarderNotes()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white p-2.5 rounded-lg font-bold text-sm">💾 Enregistrer</button>
+                <button onclick="document.getElementById('divNotesModal').classList.add('hidden')" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 p-2.5 rounded-lg font-bold text-sm">❌ Fermer</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         /* ================= CONFIGURATION SUPABASE ET VARIABLES ================= */
         const SUPABASE_URL = "https://thbqkeugjvsxbryfnzuo.supabase.co";
@@ -213,7 +245,7 @@
         let userAdmin = false;
         let actionEnCours = null;
 
-        // Gestion du balayage tactile (Swipe) pour ouvrir/fermer les sidebars au doigt
+        // Gestion du balayage tactile (Swipe)
         let touchStartX = 0;
         let touchEndX = 0;
 
@@ -231,25 +263,15 @@
             const menuGauche = document.getElementById('menuParametres');
             const menuDroit = document.getElementById('menuSupportsDroit');
 
-            // Glissement vers la droite depuis le bord gauche -> Ouvrir le menu gauche
             if (touchStartX < 40 && deltaX > 70) {
-                if (!menuGauche.classList.contains('open')) {
-                    basculerMenuParametres();
-                }
-            }
-            // Glissement vers la gauche pour fermer le menu gauche
-            else if (menuGauche.classList.contains('open') && deltaX < -70) {
+                if (!menuGauche.classList.contains('open')) basculerMenuParametres();
+            } else if (menuGauche.classList.contains('open') && deltaX < -70) {
                 fermerToutesSidebars();
             }
 
-            // Glissement vers la gauche depuis le bord droit -> Ouvrir le menu droit (supports)
             if (window.innerWidth - touchStartX < 40 && deltaX < -70) {
-                if (!menuDroit.classList.contains('open')) {
-                    basculerMenuSupportsDroit();
-                }
-            }
-            // Glissement vers la droite pour fermer le menu droit
-            else if (menuDroit.classList.contains('open') && deltaX > 70) {
+                if (!menuDroit.classList.contains('open')) basculerMenuSupportsDroit();
+            } else if (menuDroit.classList.contains('open') && deltaX > 70) {
                 fermerToutesSidebars();
             }
         }
@@ -352,6 +374,41 @@
         function actionPartagerPDFDepuisMenu() {
             fermerToutesSidebars();
             verifierModificationsEtDemanderRJ('pdf');
+        }
+
+        function ouvrirNotesGlobalesDepuisMenu() {
+            fermerToutesSidebars();
+            const chantierActif = document.getElementById('selectChantier').value || 'general';
+            const notes = localStorage.getItem(`notes_sutx_${chantierActif}`) || '';
+            document.getElementById('textareaNotes').value = notes;
+            document.getElementById('divNotesModal').classList.remove('hidden');
+        }
+
+        function sauvegarderNotes() {
+            const chantierActif = document.getElementById('selectChantier').value || 'general';
+            const notes = document.getElementById('textareaNotes').value;
+            localStorage.setItem(`notes_sutx_${chantierActif}`, notes);
+            document.getElementById('divNotesModal').classList.add('hidden');
+            alert("✅ Notes enregistrées localement avec succès.");
+        }
+
+        function exporterExcelDepuisMenu() {
+            fermerToutesSidebars();
+            if (rawData.length === 0) {
+                alert("Aucune donnée à exporter.");
+                return;
+            }
+            const worksheet = XLSX.utils.json_to_sheet(rawData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Suivi SUTX");
+            XLSX.writeFile(workbook, "Export_Suivi_SUTX.xlsx");
+        }
+
+        function changerUtilisateur() {
+            if (confirm("Voulez-vous vous déconnecter et changer d'utilisateur ?")) {
+                localStorage.clear();
+                location.reload();
+            }
         }
 
         /* ================= PEUPLEMENT SIDEBARS ================= */
@@ -509,7 +566,7 @@
         function lancerApplication() {
             document.getElementById('auth-overlay').classList.add('hidden');
             document.getElementById('main-app').classList.remove('hidden');
-            document.getElementById('headerInfo').innerText = `👤 SUTX : ${userPrenom} ${userName}`;
+            document.getElementById('headerInfo').querySelector('span').innerText = `👤 SUTX : ${userPrenom} ${userName}`;
 
             if (userAdmin) {
                 document.getElementById('btnMenuAdmin').style.display = 'block';
@@ -586,12 +643,14 @@
         const containerTaches = document.getElementById('containerTaches');
         const sectionTachesSupport = document.getElementById('sectionTachesSupport');
         const sectionActionsRapides = document.getElementById('sectionActionsRapides');
+        const sectionFiltreTaches = document.getElementById('sectionFiltreTaches');
 
         selectChantier.addEventListener('change', () => {
             selectSupport.innerHTML = '<option value="">Choisir...</option>';
             document.getElementById('labelSupportActif').innerText = "-- Choisir support --";
             sectionTachesSupport.classList.add('hidden');
             sectionActionsRapides.classList.add('hidden');
+            sectionFiltreTaches.classList.add('hidden');
             containerTaches.innerHTML = '';
             
             const chantierChoisi = selectChantier.value;
@@ -606,6 +665,7 @@
         });
 
         selectSupport.addEventListener('change', () => {
+            document.getElementById('filtreTachesInput').value = '';
             rafraichirAffichageTaches();
         });
 
@@ -613,16 +673,24 @@
             containerTaches.innerHTML = '';
             const chantierChoisi = selectChantier.value;
             const supportChoisi = selectSupport.value;
+            const filtreTacheTxt = document.getElementById('filtreTachesInput').value.toLowerCase();
 
             if (!supportChoisi) {
                 sectionTachesSupport.classList.add('hidden');
                 sectionActionsRapides.classList.add('hidden');
+                sectionFiltreTaches.classList.add('hidden');
                 return;
             }
 
             const lignesFiltrees = rawData.filter(r => r.Chantier === chantierChoisi && r.Support === supportChoisi);
+            const lignesVisibles = lignesFiltrees.filter(r => !filtreTacheTxt || r.Tache.toLowerCase().includes(filtreTacheTxt));
 
-            lignesFiltrees.forEach((item) => {
+            const totalSupport = lignesFiltrees.length;
+            const faitesSupport = lignesFiltrees.filter(r => ['vrai', 'true', '1'].includes(String(r.Fait).toLowerCase().trim())).length;
+            const pctSupport = totalSupport > 0 ? Math.round((faitesSupport / totalSupport) * 100) : 0;
+            document.getElementById('badgeProgressionSupport').innerText = `${faitesSupport} / ${totalSupport} (${pctSupport}%)`;
+
+            lignesVisibles.forEach((item) => {
                 const indexGlobal = rawData.indexOf(item);
                 const isChecked = ['vrai', 'true', '1'].includes(String(item.Fait).toLowerCase().trim());
                 
@@ -646,6 +714,7 @@
 
             sectionTachesSupport.classList.remove('hidden');
             sectionActionsRapides.classList.remove('hidden');
+            sectionFiltreTaches.classList.remove('hidden');
         }
 
         function ouvrirFBM() {
@@ -687,6 +756,7 @@
         async function modifierLigne(index, champ, valeur) {
             rawData[index][champ] = valeur;
             rawData[index].modifie = true;
+            rafraichirAffichageTaches();
 
             const ligne = rawData[index];
             if (!ligne.id) return;
@@ -775,7 +845,7 @@
             }
             sessionRJ = saisiRJ;
             document.getElementById('divRJModal').classList.add('hidden');
-            document.getElementById('headerInfo').innerText = `👤 SUTX : ${userPrenom} ${userName} | 📌 RJ : ${sessionRJ}`;
+            document.getElementById('headerInfo').querySelector('span').innerText = `👤 SUTX : ${userPrenom} ${userName} | 📌 RJ : ${sessionRJ}`;
 
             if (actionEnCours === 'pdf') {
                 genererEtPartagerPDF();
@@ -902,14 +972,14 @@
                 return [chantier, faites, total, `${pct}%`];
             });
 
-            doc.autoTable({
-                startY: 45,
-                head: [tableColumns],
-                body: tableRows,
-                theme: 'grid',
-                headStyles: { fillColor: [37, 99, 235], textColor: [255, 255, 255] },
-                styles: { fontSize: 10, cellPadding: 4 }
-            });
+    doc.autoTable({
+        startY: 45,
+        head: [tableColumns],
+        body: tableRows,
+        theme: 'grid',
+        headStyles: { fillColor: [37, 99, 235], textColor: [255, 255, 255] },
+        styles: { fontSize: 10, cellPadding: 4 }
+    });
 
             const pdfOutput = doc.output('blob');
             const fileName = `Avancement_Chantiers.pdf`;
