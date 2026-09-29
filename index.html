@@ -133,7 +133,7 @@
                 <button onclick="changerUtilisateur()" class="text-xs bg-white border border-blue-200 px-2 py-1 rounded text-blue-600 hover:bg-blue-100 transition">Changer</button>
             </div>
             
-            <div class="grid grid-cols-2 gap-3 mb-4">
+            <div class="grid grid-cols-2 gap-3 mb-3">
                 <button type="button" onclick="basculerMenuParametres()" class="p-2.5 border rounded-lg bg-blue-50 border-blue-200 text-left hover:bg-blue-100 transition shadow-sm">
                     <span class="block text-xs font-bold uppercase text-gray-600 mb-0.5">🏗 Chantier ▾</span>
                     <span id="labelChantierActif" class="block text-sm font-bold text-blue-700 truncate">Choisir chantier</span>
@@ -141,6 +141,13 @@
                 <button type="button" onclick="basculerMenuSupportsDroit()" class="p-2.5 border rounded-lg bg-blue-50 border-blue-200 text-left hover:bg-blue-100 transition shadow-sm">
                     <span class="block text-xs font-bold uppercase text-gray-600 mb-0.5">📍 Support ▾</span>
                     <span id="labelSupportActif" class="block text-sm font-bold text-blue-700 truncate">-- Choisir support --</span>
+                </button>
+            </div>
+
+            <!-- BOUTON DE SCAN QR CODE DEPUIS L'APPLICATION -->
+            <div class="mb-4">
+                <button type="button" onclick="lancerScanQRApp()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white p-2.5 rounded-lg font-bold text-sm shadow transition flex items-center justify-center gap-2">
+                    <span>📷</span> Scanner un QR Code Support / Chantier
                 </button>
             </div>
 
@@ -194,6 +201,22 @@
             <div id="conteneurAdminHierarchique" class="space-y-3"></div>
         </div>
 
+    </div>
+
+    <!-- MODALE SCANNER QR CODE CAMERA INTERNE -->
+    <div id="divQRModal" class="hidden fixed inset-0 bg-black bg-opacity-80 flex flex-col items-center justify-center z-50 p-4">
+        <div class="bg-white p-4 rounded-xl shadow-xl w-full max-w-md text-center relative">
+            <h3 class="font-bold text-lg mb-2 text-gray-800">📷 Scanner un QR Code</h3>
+            <p class="text-xs text-gray-600 mb-3">Pointez la caméra vers le QR code du support ou du chantier.</p>
+            <div class="relative w-full aspect-square bg-black rounded-lg overflow-hidden mb-3 flex items-center justify-center">
+                <video id="qrVideoPreview" class="w-full h-full object-cover" autoplay playsinline muted></video>
+                <div class="absolute inset-0 border-2 border-dashed border-blue-400 rounded-lg pointer-events-none m-8"></div>
+            </div>
+            <p id="qrStatusText" class="text-xs text-blue-600 font-bold mb-3">Recherche de caméra...</p>
+            <div class="flex gap-2">
+                <button onclick="fermerModalScanQR()" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 p-2.5 rounded-lg font-bold text-sm">❌ Fermer</button>
+            </div>
+        </div>
     </div>
 
     <!-- Modale RJ -->
@@ -250,6 +273,8 @@
         let userPrenom = localStorage.getItem('prenomSutx') || "";
         let userAdmin = false;
         let actionEnCours = null;
+        let qrStream = null;
+        let qrScanInterval = null;
 
         // Gestion du réseau et de la file d'attente hors-ligne
         let estEnLigne = navigator.onLine;
@@ -351,6 +376,12 @@
             
             if (valActuelle && chantiers.includes(valActuelle)) {
                 selectC.value = valActuelle;
+                document.getElementById('labelChantierActif').innerText = valActuelle;
+            } else if (chantiers.length > 0 && !valActuelle) {
+                // Sélection automatique du premier chantier par défaut si aucun n'est choisi
+                selectC.value = chantiers[0];
+                document.getElementById('labelChantierActif').innerText = chantiers[0];
+                selectC.dispatchEvent(new Event('change'));
             }
         }
 
@@ -370,6 +401,85 @@
                 verifierAccesEtLancer();
             }
         });
+
+        /* ================= GESTION DU SCANNER QR CODE INTÉGRÉ ================= */
+        async function lancerScanQRApp() {
+            const modal = document.getElementById('divQRModal');
+            const video = document.getElementById('qrVideoPreview');
+            const statusText = document.getElementById('qrStatusText');
+            modal.classList.remove('hidden');
+            statusText.innerText = "Accès à la caméra en cours...";
+
+            try {
+                qrStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                video.srcObject = qrStream;
+                await video.play();
+                statusText.innerText = "Pointez le QR code...";
+
+                if ('BarcodeDetector' in window) {
+                    const barcodeDetector = new BarcodeDetector({ formats: ['qr_code'] });
+                    qrScanInterval = setInterval(async () => {
+                        try {
+                            const codes = await barcodeDetector.detect(video);
+                            if (codes.length > 0) {
+                                traiterTexteQR(codes[0].rawValue);
+                            }
+                        } catch (e) {}
+                    }, 400);
+                } else {
+                    statusText.innerText = "⚠️ Scanner natif non supporté par ce navigateur. Entrez le support manuellement.";
+                }
+            } catch (err) {
+                console.error("Erreur caméra :", err);
+                statusText.innerText = "❌ Impossible d'accéder à la caméra.";
+            }
+        }
+
+        function fermerModalScanQR() {
+            if (qrScanInterval) clearInterval(qrScanInterval);
+            if (qrStream) {
+                qrStream.getTracks().forEach(track => track.stop());
+                qrStream = null;
+            }
+            document.getElementById('divQRModal').classList.add('hidden');
+        }
+
+        function traiterTexteQR(texte) {
+            fermerModalScanQR();
+            let supportTrouve = texte.trim();
+            let chantierTrouve = "";
+
+            // Format possible support|chantier ou direct support
+            if (texte.includes('|')) {
+                const parts = texte.split('|');
+                chantierTrouve = parts[0].trim();
+                supportTrouve = parts[1].trim();
+            }
+
+            if (chantierTrouve) {
+                document.getElementById('selectChantier').value = chantierTrouve;
+                document.getElementById('selectChantier').dispatchEvent(new Event('change'));
+                document.getElementById('labelChantierActif').innerText = chantierTrouve;
+            }
+
+            const chantierActif = document.getElementById('selectChantier').value;
+            if (!chantierActif) {
+                alert(`QR Code scanné : "${supportTrouve}". Veuillez d'abord choisir un chantier.`);
+                basculerMenuParametres();
+                return;
+            }
+
+            // Mettre à jour la liste des supports du chantier actif
+            const supports = [...new Set(rawData.filter(r => r.Chantier === chantierActif).map(r => r.Support))].filter(Boolean);
+            
+            if (supports.includes(supportTrouve)) {
+                document.getElementById('selectSupport').value = supportTrouve;
+                document.getElementById('selectSupport').dispatchEvent(new Event('change'));
+                document.getElementById('labelSupportActif').innerText = supportTrouve;
+            } else {
+                alert(`⚠️ Le support "${supportTrouve}" n'a pas été trouvé dans le chantier "${chantierActif}".`);
+            }
+        }
 
         /* ================= GESTION DES SIDEBARS ================= */
         function basculerMenuParametres() {
@@ -726,7 +836,6 @@
                 const contenuSupports = document.createElement('div');
                 contenuSupports.className = "hidden p-4 border-t bg-gray-50/50 space-y-3";
 
-                // Récupérer les supports de ce chantier
                 const supports = [...new Set(lignesChantier.map(r => r.Support))].filter(Boolean);
                 
                 supports.forEach(support => {
