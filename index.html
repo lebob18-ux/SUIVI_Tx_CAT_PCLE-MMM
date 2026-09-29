@@ -23,10 +23,10 @@
             background-color:rgba(0,0,0,0.4); z-index:999; }
         .sidebar-backdrop.active { display:block; }
 
-        /* Sidebar GAUCHE (menu / chantiers) - Largeur réduite pour meilleur visibilité (300px max, responsive) */
+        /* Sidebar GAUCHE (menu / chantiers) */
         .sidebar { height:100%; width:0; position:fixed; z-index:1000; top:0; left:0; background-color:#111;
-            overflow-x:hidden; overflow-y:auto; transition:0.3s; padding-top:60px; padding-bottom:120px;
-            box-shadow:2px 0 5px rgba(0,0,0,0.5); max-width: 85vw; width: 0; }
+            overflow-x:hidden; overflow-y:auto; transition:width 0.25s ease; padding-top:60px; padding-bottom:120px;
+            box-shadow:2px 0 5px rgba(0,0,0,0.5); max-width: 85vw; }
         .sidebar.open { width: 300px; }
         .sidebar button.sidebar-action-btn { padding:12px 20px; font-size:16px; color:#818181; display:block;
             background:none; border:none; width:100%; text-align:left; cursor:pointer; transition:0.2s; }
@@ -34,20 +34,20 @@
         .sidebar .btn-fermer { position:absolute; top:15px; right:20px; font-size:30px; width:auto;
             color:#818181; background:none; border:none; cursor:pointer; }
 
-        /* Sidebar DROITE (supports) - Largeur réduite pour meilleur visibilité (300px max, responsive) */
+        /* Sidebar DROITE (supports) */
         .sidebar-right { height:100%; width:0; position:fixed; z-index:1000; top:0; right:0; background-color:#111;
-            overflow-x:hidden; overflow-y:auto; transition:0.3s; padding-top:60px; padding-bottom:120px;
-            box-shadow:-2px 0 5px rgba(0,0,0,0.5); max-width: 85vw; width: 0; }
+            overflow-x:hidden; overflow-y:auto; transition:width 0.25s ease; padding-top:60px; padding-bottom:120px;
+            box-shadow:-2px 0 5px rgba(0,0,0,0.5); max-width: 85vw; }
         .sidebar-right.open { width: 300px; }
         .sidebar-right .btn-fermer-droit { position:absolute; top:15px; left:20px; font-size:30px; width:auto;
             color:#818181; background:none; border:none; cursor:pointer; }
 
         /* Boutons fixes en bas des sidebars */
         .sidebar-fixed-footer { position:fixed; bottom:0; width:0; overflow:hidden; background-color:#1a1a1a;
-            box-sizing:border-box; border-top:1px solid #333; transition:width 0.3s; z-index:1001; }
+            box-sizing:border-box; border-top:1px solid #333; transition:width 0.25s ease; z-index:1001; }
         #footerGauche { left:0; }
         #footerDroit { right:0; }
-        .sidebar.open ~ #footerGauche, .sidebar[style*="width: 300"] ~ #footerGauche, #footerGauche.open { width: 300px; }
+        .sidebar.open ~ #footerGauche, #footerGauche.open { width: 300px; }
         .sidebar-right.open ~ #footerDroit, #footerDroit.open { width: 300px; }
         
         .sidebar-fixed-footer button { display:block; width:100%; background-color:#2563eb; color:#fff; border:none;
@@ -66,7 +66,6 @@
     <div id="menuParametres" class="sidebar">
         <button class="btn-fermer" onclick="basculerMenuParametres()">&times;</button>
 
-        <!-- Boutons Saisie / Admin intégrés tout en haut sous la fermeture -->
         <div style="padding: 10px 20px 15px 20px; display: flex; gap: 8px; border-bottom: 1px solid #222; margin-bottom: 10px;">
             <button id="btnMenuSaisie" onclick="changerOnglet(1); fermerToutesSidebars();" style="flex: 1; padding: 10px; font-size: 13px; font-weight: bold; background: #2563eb; color: #fff; border: none; border-radius: 6px; cursor: pointer; transition: 0.2s;">Saisie</button>
             <button id="btnMenuAdmin" onclick="changerOnglet(2); fermerToutesSidebars();" style="flex: 1; padding: 10px; font-size: 13px; font-weight: bold; background: #333; color: #aaa; border: none; border-radius: 6px; cursor: pointer; display: none; transition: 0.2s;">Admin</button>
@@ -101,7 +100,7 @@
         </div>
     </div>
 
-    <!-- ÉCRAN D'IDENTIFICATION (Nom, Prénom, Email) -->
+    <!-- ÉCRAN D'IDENTIFICATION -->
     <div id="auth-overlay" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
         <div class="bg-white p-6 rounded-xl shadow-xl w-full max-w-sm text-center">
             <h2 class="text-xl font-bold text-gray-800 mb-2">🔐 Identification SUTX</h2>
@@ -117,7 +116,7 @@
     <!-- CONTENU PRINCIPAL -->
     <div id="main-app" class="max-w-4xl mx-auto bg-white rounded-xl shadow-md p-6 hidden">
         
-        <!-- ================= PAGE 1 : SAISIE ================= -->
+        <!-- PAGE 1 : SAISIE -->
         <div id="page1">
             <div id="containerActions" class="hidden flex gap-2 justify-end mb-4">
                 <button id="btnCopier" onclick="copierTravaux()" class="bg-gray-800 hover:bg-gray-900 text-white px-3 py-2 rounded-lg font-bold text-sm shadow transition flex items-center gap-1.5">
@@ -132,7 +131,7 @@
             
             <div class="grid grid-cols-2 gap-3 mb-4">
                 <button type="button" onclick="basculerMenuParametres()" class="p-2.5 border rounded-lg bg-blue-50 border-blue-200 text-left hover:bg-blue-100 transition">
-                    <span class="block text-xs font-bold uppercase text-gray-600 mb-0.5">🏗️️ Chantier ▾</span>
+                    <span class="block text-xs font-bold uppercase text-gray-600 mb-0.5">🏗 Chantier ▾</span>
                     <span id="labelChantierActif" class="block text-sm font-bold text-blue-700 truncate">Choisir chantier</span>
                 </button>
                 <button type="button" onclick="basculerMenuSupportsDroit()" class="p-2.5 border rounded-lg bg-blue-50 border-blue-200 text-left hover:bg-blue-100 transition">
@@ -141,24 +140,17 @@
                 </button>
             </div>
 
-            <!-- Listes natives gardées cachées : elles portent les valeurs, les sidebars les pilotent -->
             <div style="display:none;">
-                <select id="selectChantier">
-                    <option value="">Choisir...</option>
-                </select>
-                <select id="selectSupport" disabled>
-                    <option value="">Choisir...</option>
-                </select>
+                <select id="selectChantier"><option value="">Choisir...</option></select>
+                <select id="selectSupport" disabled><option value="">Choisir...</option></select>
             </div>
 
-            <!-- Lien vers l'app FBM (visible quand un support est choisi) -->
             <div id="sectionLienFBM" class="hidden mb-4">
                 <button onclick="ouvrirFBM()" class="w-full bg-orange-500 hover:bg-orange-600 text-white p-3 rounded-lg font-bold text-sm shadow transition flex items-center justify-center gap-2">
                     <span>🚧</span> Ouvrir FBM pour ce support
                 </button>
             </div>
 
-            <!-- Boutons globaux pour cocher / décocher rapidement toutes les tâches du support -->
             <div id="sectionActionsRapides" class="hidden flex flex-wrap gap-2 mb-4">
                 <button onclick="cocherToutSupport(true)" class="bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1">
                     <span>✅</span> Tout cocher sur ce support
@@ -179,7 +171,7 @@
             </div>
         </div>
 
-        <!-- ================= PAGE 2 : AVANCEMENT CHANTIERS ================= -->
+        <!-- PAGE 2 : AVANCEMENT CHANTIERS -->
         <div id="page2" class="hidden">
             <div class="flex justify-between items-center mb-4 border-b pb-4">
                 <h2 class="text-xl font-bold text-gray-800">📊 Avancement Global des Chantiers</h2>
@@ -222,7 +214,7 @@
     </div>
 
     <script>
-        /* ================= CONFIGURATION SUPABASE =================*/
+        /* ================= CONFIGURATION SUPABASE ET VARIABLES ================= */
         const SUPABASE_URL = "https://thbqkeugjvsxbryfnzuo.supabase.co";
         const SUPABASE_ANON_KEY = "sb_publishable_2-Ij-nrTPeK6rB-kSD-QTg_b42zNakq";
 
@@ -236,7 +228,47 @@
         let userAdmin = false;
         let actionEnCours = null;
 
-        // Fonction de chargement des données depuis Supabase restaurée et assurée au démarrage
+        // Gestion du balayage tactile (Swipe) pour ouvrir/fermer les sidebars au doigt
+        let touchStartX = 0;
+        let touchEndX = 0;
+
+        window.addEventListener('touchstart', e => {
+            touchStartX = e.changedTouches[0].screenX;
+        }, false);
+
+        window.addEventListener('touchend', e => {
+            touchEndX = e.changedTouches[0].screenX;
+            gererSwipeTactile();
+        }, false);
+
+        function gererSwipeTactile() {
+            const deltaX = touchEndX - touchStartX;
+            const menuGauche = document.getElementById('menuParametres');
+            const menuDroit = document.getElementById('menuSupportsDroit');
+
+            // Glissement vers la droite depuis le bord gauche -> Ouvrir le menu gauche
+            if (touchStartX < 40 && deltaX > 70) {
+                if (!menuGauche.classList.contains('open')) {
+                    basculerMenuParametres();
+                }
+            }
+            // Glissement vers la gauche pour fermer le menu gauche
+            else if (menuGauche.classList.contains('open') && deltaX < -70) {
+                fermerToutesSidebars();
+            }
+
+            // Glissement vers la gauche depuis le bord droit -> Ouvrir le menu droit (supports)
+            if (window.innerWidth - touchStartX < 40 && deltaX < -70) {
+                if (!menuDroit.classList.contains('open')) {
+                    basculerMenuSupportsDroit();
+                }
+            }
+            // Glissement vers la droite pour fermer le menu droit
+            else if (menuDroit.classList.contains('open') && deltaX > 70) {
+                fermerToutesSidebars();
+            }
+        }
+
         async function chargerDonneesSupabase() {
             try {
                 const { data, error } = await supabaseClient
@@ -246,7 +278,6 @@
                 if (error) throw error;
                 rawData = data || [];
                 
-                // Mettre à jour automatiquement le select caché des chantiers
                 const selectC = document.getElementById('selectChantier');
                 const valActuelle = selectC.value;
                 selectC.innerHTML = '<option value="">Choisir...</option>';
@@ -277,7 +308,7 @@
             }
         });
 
-        /* ================= GESTION DES MENUS LATÉRAUX (SIDEBARS) ================= -->
+        /* ================= GESTION DES SIDEBARS ================= */
         function basculerMenuParametres() {
             const menu = document.getElementById('menuParametres');
             const backdrop = document.getElementById('sidebarBackdrop');
@@ -296,7 +327,7 @@
         function basculerMenuSupportsDroit() {
             const chantierActif = document.getElementById('selectChantier').value;
             if (!chantierActif) {
-                alert("Veuillez d'abord sélectionner un chantier dans le menu de gauche.");
+                alert("Veuillez d'abord sélectionner un chantier.");
                 basculerMenuParametres();
                 return;
             }
@@ -321,11 +352,6 @@
             document.getElementById('footerGauche').classList.remove('open');
             document.getElementById('footerDroit').classList.remove('open');
             document.getElementById('sidebarBackdrop').classList.remove('active');
-        }
-
-        function ouvrirOngletAdminDepuisMenu() {
-            fermerToutesSidebars();
-            changerOnglet(2);
         }
 
         function ouvrirFBMDepuisMenu() {
@@ -412,7 +438,7 @@
             peuplerSidebarSupports();
         }
 
-        /* ================= CONNEXION & AUTHENTIFICATION ================= */
+        /* ================= AUTHENTIFICATION & CONNEXION ================= */
         async function enregistrerConnexion() {
             const nomInput = document.getElementById('auth-nom').value.trim();
             const prenomInput = document.getElementById('auth-prenom').value.trim();
@@ -420,7 +446,7 @@
             const errorEl = document.getElementById('auth-error');
 
             if (!nomInput || !prenomInput || !emailInput) {
-                errorEl.textContent = "Veuillez remplir tous les champs (Nom, Prénom, Email).";
+                errorEl.textContent = "Veuillez remplir tous les champs.";
                 errorEl.classList.remove('hidden');
                 return;
             }
@@ -437,9 +463,7 @@
                 if (!userRecord) {
                     const { data: newRecord, error: insertError } = await supabaseClient
                         .from('app_bob')
-                        .insert([
-                            { email: emailInput, nom: nomInput, prenom: prenomInput, sutx: false, admin: false }
-                        ])
+                        .insert([{ email: emailInput, nom: nomInput, prenom: prenomInput, sutx: false, admin: false }])
                         .select()
                         .maybeSingle();
 
@@ -453,7 +477,7 @@
                 }
 
                 if (!userRecord || userRecord.sutx !== true) {
-                    errorEl.textContent = "❌ Accès non autorisé. Veuillez contacter l'administrateur.";
+                    errorEl.textContent = "❌ Accès non autorisé. Contactez l'administrateur.";
                     errorEl.classList.remove('hidden');
                     return;
                 }
@@ -468,10 +492,9 @@
                 localStorage.setItem('emailSutx', userEmail);
 
                 lancerApplication();
-
             } catch (err) {
                 console.error("Erreur de connexion :", err);
-                errorEl.textContent = `❌ Erreur : ${err.message || "Impossible de vérifier l'accès."}`;
+                errorEl.textContent = `❌ Erreur : ${err.message || "Erreur de connexion."}`;
                 errorEl.classList.remove('hidden');
             }
         }
@@ -793,7 +816,7 @@
             const elementsFaites = rawData.filter(r => r.modifie === true && ['vrai', 'true', '1'].includes(String(r.Fait).toLowerCase().trim()));
 
             if (elementsFaites.length === 0) {
-                alert("Aucun travail validé (coché fait) n'a été trouvé pour la copie.");
+                alert("Aucun travail validé trouvé pour la copie.");
                 return;
             }
 
@@ -898,7 +921,7 @@
 
             doc.setTextColor(50, 50, 50);
             doc.setFontSize(11);
-            doc.text(`Opérateur : ${userPrenom} ` + userName, 14, 35);
+            doc.text(`Opérateur : ${userPrenom} ${userName}`, 14, 35);
 
             const tableColumns = ["Chantier", "Tâches Réalisées", "Total Tâches", "Avancement"];
             const tableRows = chantiers.map(chantier => {
@@ -927,7 +950,7 @@
                     await navigator.share({
                         files: [file],
                         title: 'Avancement Chantiers',
-                        text: `Bonjour, voici le bilan d'avancement global des chantiers.\nOpérateur : ${userPrenom} ${userName}`
+                        text: `Bonjour, voici le bilan d'avancement global.\nOpérateur : ${userPrenom} ${userName}`
                     });
                     return;
                 }
