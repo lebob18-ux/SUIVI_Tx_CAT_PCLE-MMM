@@ -8,8 +8,10 @@
     <meta name="theme-color" content="#2563eb">
     <link rel="icon" href="icon-192.png" type="image/png">
 
-    <!-- Tailwind CSS -->
+    <!-- Tailwind CSS, SheetJS, PapaParse -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <!-- jsPDF et AutoTable pour un PDF pro -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
@@ -78,6 +80,8 @@
         </div>
 
         <button class="sidebar-action-btn" onclick="ouvrirFBMDepuisMenu()">🚧 Ouvrir FBM</button>
+        <button class="sidebar-action-btn" onclick="ouvrirNotesGlobalesDepuisMenu()">📝 Notes & Consignes</button>
+        <button class="sidebar-action-btn" onclick="exporterExcelDepuisMenu()">📊 Exporter Excel / CSV</button>
 
         <div style="padding: 15px 20px;">
             <label style="color: #9ca3af; font-size: 13px; display: block; margin-bottom: 8px; font-weight: bold;">🏗️ Choisir un chantier :</label>
@@ -219,6 +223,19 @@
         </div>
     </div>
 
+    <!-- Modale Notes & Consignes -->
+    <div id="divNotesModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-md">
+            <p class="font-bold text-lg mb-2 text-gray-800 text-center">📝 Notes & Consignes de Chantier</p>
+            <p class="text-xs text-gray-600 mb-3 text-center">Consignez ici les informations utiles pour l'équipe (sauvegardées localement).</p>
+            <textarea id="textareaNotes" rows="6" placeholder="Rédiger vos consignes ici..." class="w-full p-3 border rounded-lg mb-4 text-sm focus:ring-2 focus:ring-blue-500"></textarea>
+            <div class="flex gap-2">
+                <button onclick="sauvegarderNotes()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white p-2.5 rounded-lg font-bold text-sm">💾 Enregistrer</button>
+                <button onclick="document.getElementById('divNotesModal').classList.add('hidden')" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 p-2.5 rounded-lg font-bold text-sm">❌ Fermer</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         /* ================= CONFIGURATION SUPABASE ET VARIABLES ================= */
         const SUPABASE_URL = "https://thbqkeugjvsxbryfnzuo.supabase.co";
@@ -233,16 +250,6 @@
         let userPrenom = localStorage.getItem('prenomSutx') || "";
         let userAdmin = false;
         let actionEnCours = null;
-
-        // Échappement HTML pour tout ce qui est injecté via innerHTML
-        function esc(v) {
-            return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-        }
-
-        // Tri croissant "naturel" (Support 2 avant Support 10)
-        function trierCroissant(a, b) {
-            return String(a).localeCompare(String(b), 'fr', { numeric: true, sensitivity: 'base' });
-        }
 
         // Gestion du réseau et de la file d'attente hors-ligne
         let estEnLigne = navigator.onLine;
@@ -303,10 +310,6 @@
         }
 
         async function chargerDonneesSupabase() {
-            // On pousse d'abord les modifs hors-ligne en attente, avant de charger le serveur
-            chargerDonneesLocalesCache();
-            if (estEnLigne) await verifierEtSynchroniserFileAttente();
-
             try {
                 if (estEnLigne) {
                     const { data, error } = await supabaseClient
@@ -314,25 +317,10 @@
                         .select('*');
 
                     if (error) throw error;
-
-                    // On conserve ce qui n'a pas pu être envoyé
-                    const enAttente = rawData.filter(r => r.aSync === true);
                     rawData = data || [];
-                    enAttente.forEach(p => {
-                        const cible = p.id ? rawData.find(r => r.id === p.id) : null;
-                        if (cible) {
-                            cible.Fait = p.Fait;
-                            cible.Observation = p.Observation;
-                            cible.nom = p.nom;
-                            cible.prenom = p.prenom;
-                            cible.modifie = true;
-                            cible.aSync = true;
-                        } else if (!p.id) {
-                            rawData.push(p);
-                        }
-                    });
-
                     localStorage.setItem('cache_suivi_sutx', JSON.stringify(rawData));
+                } else {
+                    chargerDonneesLocalesCache();
                 }
             } catch (err) {
                 console.warn("Impossible de joindre Supabase, bascule sur le cache local :", err);
@@ -449,6 +437,34 @@
             verifierModificationsEtDemanderRJ('pdf');
         }
 
+        function ouvrirNotesGlobalesDepuisMenu() {
+            fermerToutesSidebars();
+            const chantierActif = document.getElementById('selectChantier').value || 'general';
+            const notes = localStorage.getItem(`notes_sutx_${chantierActif}`) || '';
+            document.getElementById('textareaNotes').value = notes;
+            document.getElementById('divNotesModal').classList.remove('hidden');
+        }
+
+        function sauvegarderNotes() {
+            const chantierActif = document.getElementById('selectChantier').value || 'general';
+            const notes = document.getElementById('textareaNotes').value;
+            localStorage.setItem(`notes_sutx_${chantierActif}`, notes);
+            document.getElementById('divNotesModal').classList.add('hidden');
+            alert("✅ Notes enregistrées localement avec succès.");
+        }
+
+        function exporterExcelDepuisMenu() {
+            fermerToutesSidebars();
+            if (rawData.length === 0) {
+                alert("Aucune donnée à exporter.");
+                return;
+            }
+            const worksheet = XLSX.utils.json_to_sheet(rawData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Suivi SUTX");
+            XLSX.writeFile(workbook, "Export_Suivi_SUTX.xlsx");
+        }
+
         function changerUtilisateur() {
             if (confirm("Voulez-vous vous déconnecter et changer d'utilisateur ?")) {
                 localStorage.clear();
@@ -488,7 +504,7 @@
         function peuplerSidebarSupports() {
             const chantierActif = document.getElementById('selectChantier').value;
             const filtre = document.getElementById('filtreSupportInput').value.toLowerCase();
-            const supports = [...new Set(rawData.filter(r => r.Chantier === chantierActif).map(r => r.Support))].filter(Boolean).sort(trierCroissant);
+            const supports = [...new Set(rawData.filter(r => r.Chantier === chantierActif).map(r => r.Support))].filter(Boolean);
             const supportsFiltres = supports.filter(s => s.toLowerCase().includes(filtre));
             const container = document.getElementById('sidebarSupportsContainer');
             
@@ -510,7 +526,7 @@
                 const btn = document.createElement('button');
                 btn.type = 'button';
                 btn.style.cssText = `width:100%; text-align:left; padding:10px 14px; border-radius:6px; font-size:13px; font-weight:${isSelected ? 'bold' : 'normal'}; background:${isSelected ? '#2563eb' : '#222'}; color:${isSelected ? '#fff' : '#ccc'}; border:none; cursor:pointer; display:flex; justify-content:space-between; align-items:center; transition:0.2s;`;
-                btn.innerHTML = `<span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding-right:8px;">${esc(s)}</span><span style="font-size:11px; background:${isSelected ? '#1d4ed8' : '#333'}; padding:2px 6px; border-radius:4px; color:#fff;">${faites}/${total}</span>`;
+                btn.innerHTML = `<span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding-right:8px;">${s}</span><span style="font-size:11px; background:${isSelected ? '#1d4ed8' : '#333'}; padding:2px 6px; border-radius:4px; color:#fff;">${faites}/${total}</span>`;
                 btn.onclick = () => {
                     document.getElementById('selectSupport').value = s;
                     document.getElementById('selectSupport').dispatchEvent(new Event('change'));
@@ -696,7 +712,7 @@
                 headerChantier.className = "p-4 bg-gray-50 hover:bg-blue-50 cursor-pointer flex justify-between items-center transition";
                 headerChantier.innerHTML = `
                     <div>
-                        <span class="font-bold text-gray-800 text-base">🏗️ ${esc(chantier)}</span>
+                        <span class="font-bold text-gray-800 text-base">🏗️ ${chantier}</span>
                         <div class="text-xs text-gray-500 mt-1">${tachesFaites} / ${totalTaches} tâches validées (${pourcentage}%)</div>
                     </div>
                     <div class="flex items-center gap-3">
@@ -711,7 +727,7 @@
                 contenuSupports.className = "hidden p-4 border-t bg-gray-50/50 space-y-3";
 
                 // Récupérer les supports de ce chantier
-                const supports = [...new Set(lignesChantier.map(r => r.Support))].filter(Boolean).sort(trierCroissant);
+                const supports = [...new Set(lignesChantier.map(r => r.Support))].filter(Boolean);
                 
                 supports.forEach(support => {
                     const lignesSupport = lignesChantier.filter(r => r.Support === support);
@@ -725,7 +741,7 @@
                     const headerSupport = document.createElement('div');
                     headerSupport.className = "p-3 hover:bg-gray-100 cursor-pointer flex justify-between items-center text-sm font-semibold text-gray-700";
                     headerSupport.innerHTML = `
-                        <span>📍 Support : ${esc(support)}</span>
+                        <span>📍 Support : ${support}</span>
                         <span class="text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full font-bold">${faitesSup}/${totalSup} (${pctSup}%) ▾</span>
                     `;
 
@@ -739,9 +755,9 @@
                         ligneItem.innerHTML = `
                             <div class="flex items-center gap-2">
                                 <span>${estFait ? '✅' : '❌'}</span>
-                                <span class="font-medium text-gray-800">${esc(tache.Tache)}</span>
+                                <span class="font-medium text-gray-800">${tache.Tache}</span>
                             </div>
-                            <span class="text-gray-500 italic">Obs : ${esc(tache.Observation) || 'Aucune'}</span>
+                            <span class="text-gray-500 italic">Obs : ${tache.Observation || 'Aucune'}</span>
                         `;
                         detailsTravaux.appendChild(ligneItem);
                     });
@@ -787,7 +803,7 @@
                 return;
             }
 
-            const supports = [...new Set(rawData.filter(r => r.Chantier === chantierChoisi).map(r => r.Support))].filter(Boolean).sort(trierCroissant);
+            const supports = [...new Set(rawData.filter(r => r.Chantier === chantierChoisi).map(r => r.Support))].filter(Boolean);
             supports.forEach(s => selectSupport.add(new Option(s, s)));
             selectSupport.disabled = false;
         });
@@ -830,10 +846,10 @@
                             onchange="modifierLigne(${indexGlobal}, 'Fait', this.checked)" 
                             class="w-6 h-6 text-blue-600 rounded cursor-pointer shrink-0">
                         <div class="flex-1 sm:flex-initial text-sm font-medium text-gray-800">
-                            ${esc(item.Tache)} ${item.isCustom ? '<span class="text-xs bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded font-bold ml-2">Ajout manuel</span>' : ''}
+                            ${item.Tache} ${item.isCustom ? '<span class="text-xs bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded font-bold ml-2">Ajout manuel</span>' : ''}
                         </div>
                     </div>
-                    <input type="text" value="${esc(item.Observation)}" placeholder="Observation..." 
+                    <input type="text" value="${item.Observation || ''}" placeholder="Observation..." 
                         onchange="modifierLigne(${indexGlobal}, 'Observation', this.value)" 
                         class="w-full sm:w-1/3 p-1.5 text-sm border rounded bg-white focus:ring-2 focus:ring-blue-500 sm:ml-auto">
                 `;
@@ -851,58 +867,54 @@
 
             if (!chantierChoisi || !supportChoisi) return;
 
-            const lignes = rawData.filter(r => r.Chantier === chantierChoisi && r.Support === supportChoisi);
-            lignes.forEach(r => { r.Fait = etatVoulu; r.modifie = true; r.nom = userName; r.prenom = userPrenom; });
+            for (let i = 0; i < rawData.length; i++) {
+                if (rawData[i].Chantier === chantierChoisi && rawData[i].Support === supportChoisi) {
+                    rawData[i].Fait = etatVoulu;
+                    rawData[i].modifie = true;
 
-            let envoye = false;
-            if (estEnLigne) {
-                try {
-                    const { error } = await supabaseClient
-                        .from('suivi_tx_cat')
-                        .update({ Fait: etatVoulu, nom: userName, prenom: userPrenom })
-                        .eq('Chantier', chantierChoisi)
-                        .eq('Support', supportChoisi);
-                    if (error) throw error;
-                    envoye = true;
-                } catch (err) {
-                    console.error("Erreur mise à jour groupée :", err);
+                    if (rawData[i].id && estEnLigne) {
+                        try {
+                            await supabaseClient
+                                .from('suivi_tx_cat')
+                                .update({ Fait: etatVoulu })
+                                .eq('id', rawData[i].id);
+                        } catch (err) {
+                            console.error(`Erreur mise à jour ID ${rawData[i].id}:`, err);
+                        }
+                    }
                 }
             }
 
-            lignes.forEach(r => { if (!envoye || !r.id) r.aSync = true; });
-            if (lignes.some(r => r.aSync)) localStorage.setItem('file_attente_sutx', '1');
-
             sauvegarderCacheLocal();
+            if (!estEnLigne) enregistrerFileAttenteModif();
             rafraichirAffichageTaches();
         }
 
         async function modifierLigne(index, champ, valeur) {
-            const ligne = rawData[index];
-            ligne[champ] = valeur;
-            ligne.modifie = true;
-            ligne.nom = userName;
-            ligne.prenom = userPrenom;
+            rawData[index][champ] = valeur;
+            rawData[index].modifie = true;
             sauvegarderCacheLocal();
             rafraichirAffichageTaches();
 
-            let envoye = false;
-            if (ligne.id && estEnLigne) {
-                try {
-                    const { error } = await supabaseClient
-                        .from('suivi_tx_cat')
-                        .update({ [champ]: valeur, nom: userName, prenom: userPrenom })
-                        .eq('id', ligne.id);
-                    if (error) throw error;
-                    envoye = true;
-                } catch (err) {
-                    console.error("Erreur de mise à jour Supabase :", err);
-                }
+            const ligne = rawData[index];
+            if (!ligne.id || !estEnLigne) {
+                enregistrerFileAttenteModif();
+                return;
             }
 
-            if (!envoye) {
-                ligne.aSync = true;
-                localStorage.setItem('file_attente_sutx', '1');
-                sauvegarderCacheLocal();
+            try {
+                const updateData = {};
+                updateData[champ] = valeur;
+
+                const { error } = await supabaseClient
+                    .from('suivi_tx_cat')
+                    .update(updateData)
+                    .eq('id', ligne.id);
+
+                if (error) throw error;
+            } catch (err) {
+                console.error("Erreur de mise à jour Supabase :", err);
+                enregistrerFileAttenteModif();
             }
         }
 
@@ -910,53 +922,29 @@
             localStorage.setItem('cache_suivi_sutx', JSON.stringify(rawData));
         }
 
+        function enregistrerFileAttenteModif() {
+            let fileAttente = JSON.parse(localStorage.getItem('file_attente_sutx') || '[]');
+            fileAttente.push({ timestamp: Date.now(), data: rawData.filter(r => r.modifie) });
+            localStorage.setItem('file_attente_sutx', JSON.stringify(fileAttente));
+        }
+
         async function verifierEtSynchroniserFileAttente() {
-            if (!estEnLigne) return;
+            const fileAttenteStr = localStorage.getItem('file_attente_sutx');
+            if (!fileAttenteStr || !estEnLigne) return;
 
-            const enAttente = rawData.filter(r => r.aSync === true);
-            if (enAttente.length === 0) {
-                localStorage.removeItem('file_attente_sutx');
-                return;
-            }
-
-            for (const item of enAttente) {
-                try {
-                    if (item.id) {
-                        const { error } = await supabaseClient
-                            .from('suivi_tx_cat')
-                            .update({ Fait: item.Fait, Observation: item.Observation, nom: item.nom || userName, prenom: item.prenom || userPrenom })
-                            .eq('id', item.id);
-                        if (error) throw error;
-                    } else {
-                        const { data, error } = await supabaseClient
-                            .from('suivi_tx_cat')
-                            .insert([{
-                                Chantier: item.Chantier,
-                                Support: item.Support,
-                                Tache: item.Tache,
-                                Fait: item.Fait,
-                                Observation: item.Observation,
-                                nom: item.nom || userName,
-                                prenom: item.prenom || userPrenom
-                            }])
-                            .select();
-                        if (error) throw error;
-                        if (data && data.length > 0) item.id = data[0].id;
-                    }
-                    item.aSync = false;
-                } catch (err) {
-                    console.error("Erreur lors de la synchronisation :", err);
+            try {
+                const elementsModifies = rawData.filter(r => r.modifie === true && r.id);
+                for (const item of elementsModifies) {
+                    await supabaseClient
+                        .from('suivi_tx_cat')
+                        .update({ Fait: item.Fait, Observation: item.Observation })
+                        .eq('id', item.id);
                 }
-            }
-
-            sauvegarderCacheLocal();
-            if (rawData.some(r => r.aSync)) {
-                localStorage.setItem('file_attente_sutx', '1');
-            } else {
                 localStorage.removeItem('file_attente_sutx');
                 console.log("✅ Synchronisation des données hors-ligne réussie.");
+            } catch (err) {
+                console.error("Erreur lors de la synchronisation :", err);
             }
-            rafraichirAffichageTaches();
         }
 
         function ouvrirModalAjoutTache() {
@@ -980,8 +968,6 @@
                 Tache: intitule,
                 Fait: true,
                 Observation: "Travail non prévu ajouté manuellement",
-                nom: userName,
-                prenom: userPrenom,
                 modifie: true,
                 isCustom: true
             };
@@ -995,9 +981,7 @@
                             Support: supportChoisi,
                             Tache: intitule,
                             Fait: true,
-                            Observation: "Travail non prévu ajouté manuellement",
-                            nom: userName,
-                            prenom: userPrenom
+                            Observation: "Travail non prévu ajouté manuellement"
                         }])
                         .select();
 
@@ -1010,12 +994,9 @@
                 }
             }
 
-            if (!nouvelleLigne.id) {
-                nouvelleLigne.aSync = true;
-                localStorage.setItem('file_attente_sutx', '1');
-            }
             rawData.push(nouvelleLigne);
             sauvegarderCacheLocal();
+            if (!estEnLigne) enregistrerFileAttenteModif();
 
             document.getElementById('divAjoutTacheModal').classList.add('hidden');
             rafraichirAffichageTaches();
