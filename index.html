@@ -501,60 +501,72 @@
             document.getElementById('divQRModal').classList.add('hidden');
         }
 
-        function traiterTexteQR(texte) {
-            fermerModalScanQR();
-            let supportTrouve = texte.trim();
-            let chantierTrouve = "";
-            logDiag(`Traitement du texte scanné : "${texte}"`);
+function traiterTexteQR(texte) {
+    fermerModalScanQR();
+    let supportTrouve = texte.trim();
+    let chantierTrouve = "";
+    logDiag(`Traitement du texte scanné : "${texte}"`);
 
-            if (texte.includes('|')) {
-                const parts = texte.split('|');
-                chantierTrouve = parts[0].trim();
-                supportTrouve = parts[1].trim();
-                logDiag(`Format séparé détecté -> Chantier: "${chantierTrouve}" | Support: "${supportTrouve}"`);
-            } else {
-                logDiag(`Format simple détecté (support seul) -> Support: "${supportTrouve}"`);
-            }
-
-            if (chantierTrouve) {
-                const selectC = document.getElementById('selectChantier');
-                const chantiersDispos = [...selectC.options].map(o => o.value);
-                if (chantiersDispos.includes(chantierTrouve)) {
-                    selectC.value = chantierTrouve;
-                    selectC.dispatchEvent(new Event('change'));
-                    document.getElementById('labelChantierActif').innerText = chantierTrouve;
-                    logDiag(`Chantier "${chantierTrouve}" appliqué avec succès.`);
-                } else {
-                    logDiag(`❌ ÉCHEC Chantier : Le chantier "${chantierTrouve}" n'existe pas dans la liste des options ! Options dispos : ${JSON.stringify(chantiersDispos)}`);
-                    afficherPopupDiagnostic();
-                    return;
-                }
-            }
-
-            const chantierActif = document.getElementById('selectChantier').value;
-            if (!chantierActif) {
-                logDiag(`❌ ÉCHEC : Aucun chantier actif sélectionné avant de chercher le support.`);
-                alert(`QR Code scanné : "${supportTrouve}". Veuillez d'abord choisir un chantier.`);
-                basculerMenuParametres();
-                afficherPopupDiagnostic();
-                return;
-            }
-
-            const supports = [...new Set(rawData.filter(r => r.Chantier === chantierActif).map(r => r.Support))].filter(Boolean);
-            logDiag(`Supports disponibles pour le chantier "${chantierActif}" (${supports.length}) : ${JSON.stringify(supports)}`);
-            
-            if (supports.includes(supportTrouve)) {
-                const selectS = document.getElementById('selectSupport');
-                selectS.value = supportTrouve;
-                selectS.dispatchEvent(new Event('change'));
-                document.getElementById('labelSupportActif').innerText = supportTrouve;
-                logDiag(`✅ Support "${supportTrouve}" trouvé et sélectionné avec succès !`);
-            } else {
-                logDiag(`❌ ÉCHEC Support : Le support "${supportTrouve}" est introuvable dans le chantier "${chantierActif}". Vérifiez l'orthographe exacte ou la casse.`);
-                alert(`⚠️ Le support "${supportTrouve}" n'a pas été trouvé dans le chantier "${chantierActif}".`);
-                afficherPopupDiagnostic();
-            }
+    // Gérer les QR codes sous forme d'URL (ex: .../?chantier=THOMERY&support=56/32)
+    if (texte.includes('?')) {
+        try {
+            const urlObj = new URL(texte);
+            const paramChantier = urlObj.searchParams.get('chantier');
+            const paramSupport = urlObj.searchParams.get('support');
+            if (paramChantier) chantierTrouve = decodeURIComponent(paramChantier).trim();
+            if (paramSupport) supportTrouve = decodeURIComponent(paramSupport).trim();
+            logDiag(`Format URL détecté -> Chantier: "${chantierTrouve}" | Support: "${supportTrouve}"`);
+        } catch (e) {
+            logDiag(`⚠️ Erreur parsing URL du QR code : ${e.message}`);
         }
+    } else if (texte.includes('|')) {
+        const parts = texte.split('|');
+        chantierTrouve = parts[0].trim();
+        supportTrouve = parts[1].trim();
+        logDiag(`Format séparé détecté -> Chantier: "${chantierTrouve}" | Support: "${supportTrouve}"`);
+    } else {
+        logDiag(`Format simple détecté (support seul) -> Support: "${supportTrouve}"`);
+    }
+
+    if (chantierTrouve) {
+        const selectC = document.getElementById('selectChantier');
+        const chantiersDispos = [...selectC.options].map(o => o.value);
+        if (chantiersDispos.includes(chantierTrouve)) {
+            selectC.value = chantierTrouve;
+            selectC.dispatchEvent(new Event('change'));
+            document.getElementById('labelChantierActif').innerText = chantierTrouve;
+            logDiag(`Chantier "${chantierTrouve}" appliqué avec succès.`);
+        } else {
+            logDiag(`❌ ÉCHEC Chantier : Le chantier "${chantierTrouve}" n'existe pas dans la liste des options ! Options dispos : ${JSON.stringify(chantiersDispos)}`);
+            afficherPopupDiagnostic();
+            return;
+        }
+    }
+
+    const chantierActif = document.getElementById('selectChantier').value;
+    if (!chantierActif) {
+        logDiag(`❌ ÉCHEC : Aucun chantier actif sélectionné avant de chercher le support.`);
+        alert(`QR Code scanné : "${supportTrouve}". Veuillez d'abord choisir un chantier.`);
+        basculerMenuParametres();
+        afficherPopupDiagnostic();
+        return;
+    }
+
+    const supports = [...new Set(rawData.filter(r => r.Chantier === chantierActif).map(r => r.Support))].filter(Boolean);
+    logDiag(`Supports disponibles pour le chantier "${chantierActif}" (${supports.length}) : ${JSON.stringify(supports)}`);
+    
+    if (supports.includes(supportTrouve)) {
+        const selectS = document.getElementById('selectSupport');
+        selectS.value = supportTrouve;
+        selectS.dispatchEvent(new Event('change'));
+        document.getElementById('labelSupportActif').innerText = supportTrouve;
+        logDiag(`✅ Support "${supportTrouve}" trouvé et sélectionné avec succès !`);
+    } else {
+        logDiag(`❌ ÉCHEC Support : Le support "${supportTrouve}" est introuvable dans le chantier "${chantierActif}". Vérifiez l'orthographe exacte ou la casse.`);
+        alert(`⚠️ Le support "${supportTrouve}" n'a pas été trouvé dans le chantier "${chantierActif}".`);
+        afficherPopupDiagnostic();
+    }
+}
 
         /* ================= GESTION DES SIDEBARS ================= */
         function basculerMenuParametres() {
