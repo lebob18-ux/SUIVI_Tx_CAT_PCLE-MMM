@@ -270,7 +270,49 @@
             </div>
         </div>
     </div>
+    <!-- Modale Hauteur & Désaxement -->
+    <div id="divMesuresModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-sm">
+            <p class="font-bold text-lg mb-1 text-gray-800 text-center">📏 Hauteur & Désaxement</p>
+            <p id="mesuresSupport" class="text-xs text-gray-500 mb-4 text-center"></p>
+            <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Hauteur (<span id="uniteHauteurLabel"></span>) *</label>
+            <input type="number" step="any" id="inputHauteur" placeholder="Ex : 5.30" class="w-full p-2.5 border rounded-lg mb-3 text-sm focus:ring-2 focus:ring-blue-500">
+            <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Désaxement (<span id="uniteDesaxementLabel"></span>) *</label>
+            <input type="number" step="any" id="inputDesaxement" placeholder="Ex : -12" class="w-full p-2.5 border rounded-lg mb-3 text-sm focus:ring-2 focus:ring-blue-500">
+            <p id="mesuresErreur" class="text-red-500 text-xs mb-3 hidden">Les deux valeurs sont obligatoires.</p>
+            <div class="flex gap-2">
+                <button onclick="validerMesures()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white p-2.5 rounded-lg font-bold text-sm">✅ Valider</button>
+                <button onclick="document.getElementById('divMesuresModal').classList.add('hidden')" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 p-2.5 rounded-lg font-bold text-sm">❌ Annuler</button>
+            </div>
+        </div>
+    </div>
 
+    <!-- Popup Information (texte + miniature zoomable) -->
+    <div id="divInfoModal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-3">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-lg flex flex-col" style="max-height:92vh;">
+            <div class="flex items-start justify-between gap-3 p-4 border-b">
+                <h3 id="infoTitre" class="font-bold text-base text-gray-800"></h3>
+                <button onclick="fermerInfoTache()" class="text-3xl leading-none text-gray-500">&times;</button>
+            </div>
+            <div class="p-4 overflow-y-auto space-y-4">
+                <p id="infoTexte" class="text-sm text-gray-700 whitespace-pre-wrap"></p>
+                <div id="infoImgZone" class="hidden">
+                    <p class="text-xs text-gray-500 mb-1">Touchez la miniature pour zoomer :</p>
+                    <img id="infoImgMini" alt="Miniature" onclick="ouvrirZoomImage(this.src)" class="w-full max-h-72 object-contain rounded-lg border bg-gray-50 cursor-zoom-in">
+                </div>
+            </div>
+            <div class="p-3 border-t">
+                <button onclick="fermerInfoTache()" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 p-2.5 rounded-lg font-bold text-sm">Fermer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Visionneuse plein écran zoomable -->
+    <div id="divZoomImg" class="hidden fixed inset-0 bg-black flex items-center justify-center" style="z-index:2000; touch-action:none;">
+        <img id="imgZoomCible" alt="" draggable="false" style="max-width:100%; max-height:100%; user-select:none; -webkit-user-drag:none;">
+        <button onclick="fermerZoomImage()" class="absolute top-3 right-3 bg-white text-gray-800 w-10 h-10 rounded-full font-bold text-xl shadow">&times;</button>
+        <p class="absolute bottom-3 left-0 right-0 text-center text-xs text-gray-300 pointer-events-none">Pincer pour zoomer • double tap pour agrandir</p>
+    </div>
     <script>
         /* ================= CONFIGURATION SUPABASE ET VARIABLES ================= */
         const APP_NAME = "suivi_tx_cat";
@@ -364,6 +406,7 @@
         }, false);
 
         function gererSwipeTactile() {
+            if (!document.getElementById('divZoomImg').classList.contains('hidden')) return;
             const deltaX = touchEndX - touchStartX;
             const menuGauche = document.getElementById('menuParametres');
             const menuDroit = document.getElementById('menuSupportsDroit');
@@ -1072,8 +1115,16 @@
 
             if (!chantierChoisi || !supportChoisi) return;
 
+            let ignorees = 0;
+
             for (let i = 0; i < rawData.length; i++) {
                 if (rawData[i].Chantier === chantierChoisi && rawData[i].Support === supportChoisi) {
+
+                    if (etatVoulu && tacheExigeMesures(rawData[i]) && !mesuresRemplies(rawData[i])) {
+                        ignorees++;
+                        continue;
+                    }
+
                     rawData[i].Fait = etatVoulu;
                     rawData[i].modifie = true;
 
@@ -1093,6 +1144,10 @@
             sauvegarderCacheLocal();
             if (!estEnLigne) enregistrerFileAttenteModif();
             rafraichirAffichageTaches();
+
+            if (ignorees > 0) {
+                alert(`⚠️ ${ignorees} tâche(s) « Hauteur & Désaxement » non cochée(s) : hauteur et désaxement sont obligatoires.`);
+            }
         }
 
         async function modifierLigne(index, champ, valeur) {
@@ -1143,7 +1198,12 @@
                 for (const item of elementsModifies) {
                     await supabaseClient
                         .from('suivi_tx_cat')
-                        .update({ Fait: item.Fait, Observation: item.Observation })
+                                                .update({
+                            Fait: item.Fait,
+                            Observation: item.Observation,
+                            hauteur: item.hauteur ?? null,
+                            desaxement: item.desaxement ?? null
+                        })
                         .eq('id', item.id);
                 }
                 localStorage.removeItem('file_attente_sutx');
@@ -1153,7 +1213,201 @@
                 logDiag(`Erreur sync hors-ligne : ${err.message || err}`);
             }
         }
+        /* ================= HAUTEUR & DÉSAXEMENT / INFO / ZOOM ================= */
+        const UNITE_HAUTEUR = "m";
+        const UNITE_DESAXEMENT = "cm";
+        let indexMesuresEnCours = null;
 
+        function normaliserTexte(t) {
+            return String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+        }
+
+        function tacheExigeMesures(item) {
+            const t = normaliserTexte(item.Tache);
+            return t.includes('hauteur') && t.includes('desaxement');
+        }
+
+        function valeurRenseignee(v) {
+            return v !== null && v !== undefined && v !== '';
+        }
+
+        function mesuresRemplies(item) {
+            return valeurRenseignee(item.hauteur) && valeurRenseignee(item.desaxement);
+        }
+
+        // Case cochée : si la tâche exige des mesures, on ouvre le sous-menu au lieu de cocher
+        function cocherTache(index, checkbox) {
+            const item = rawData[index];
+            if (checkbox.checked && tacheExigeMesures(item)) {
+                checkbox.checked = false;
+                ouvrirModalMesures(index);
+                return;
+            }
+            modifierLigne(index, 'Fait', checkbox.checked);
+        }
+
+        function ouvrirModalMesures(index) {
+            indexMesuresEnCours = index;
+            const item = rawData[index];
+            document.getElementById('uniteHauteurLabel').innerText = UNITE_HAUTEUR;
+            document.getElementById('uniteDesaxementLabel').innerText = UNITE_DESAXEMENT;
+            document.getElementById('mesuresSupport').innerText = `${item.Support || ''} — ${item.Tache || ''}`;
+            document.getElementById('inputHauteur').value = valeurRenseignee(item.hauteur) ? item.hauteur : '';
+            document.getElementById('inputDesaxement').value = valeurRenseignee(item.desaxement) ? item.desaxement : '';
+            document.getElementById('mesuresErreur').classList.add('hidden');
+            document.getElementById('divMesuresModal').classList.remove('hidden');
+            setTimeout(() => document.getElementById('inputHauteur').focus(), 50);
+        }
+
+        async function validerMesures() {
+            const h = parseFloat(document.getElementById('inputHauteur').value);
+            const d = parseFloat(document.getElementById('inputDesaxement').value);
+
+            if (isNaN(h) || isNaN(d)) {
+                document.getElementById('mesuresErreur').classList.remove('hidden');
+                return;
+            }
+
+            document.getElementById('divMesuresModal').classList.add('hidden');
+            await modifierLigneMulti(indexMesuresEnCours, { Fait: true, hauteur: h, desaxement: d });
+        }
+
+        // Comme modifierLigne, mais pour plusieurs champs en un seul update
+        async function modifierLigneMulti(index, champs) {
+            Object.assign(rawData[index], champs);
+            rawData[index].modifie = true;
+            sauvegarderCacheLocal();
+            rafraichirAffichageTaches();
+
+            const ligne = rawData[index];
+            if (!ligne.id || !estEnLigne) {
+                enregistrerFileAttenteModif();
+                return;
+            }
+
+            try {
+                const { error } = await supabaseClient
+                    .from('suivi_tx_cat')
+                    .update(champs)
+                    .eq('id', ligne.id);
+                if (error) throw error;
+            } catch (err) {
+                console.error("Erreur de mise à jour Supabase :", err);
+                logDiag(`Erreur update multi Supabase: ${err.message || err}`);
+                enregistrerFileAttenteModif();
+            }
+        }
+
+        /* ---- Popup information ---- */
+        function ouvrirInfoTache(index) {
+            const item = rawData[index];
+            document.getElementById('infoTitre').innerText = item.Tache || '';
+            document.getElementById('infoTexte').innerText = item.info || 'Aucune information.';
+
+            const zone = document.getElementById('infoImgZone');
+            const img = document.getElementById('infoImgMini');
+            if (item.img) {
+                img.src = item.img;
+                zone.classList.remove('hidden');
+            } else {
+                img.removeAttribute('src');
+                zone.classList.add('hidden');
+            }
+            document.getElementById('divInfoModal').classList.remove('hidden');
+        }
+
+        function fermerInfoTache() {
+            document.getElementById('divInfoModal').classList.add('hidden');
+        }
+
+        /* ---- Visionneuse zoomable (pincer, déplacer, double tap, molette) ---- */
+        let zoomImg = { scale: 1, x: 0, y: 0 };
+        const zoomPointers = new Map();
+        let zoomDistInit = 0, zoomScaleInit = 1, zoomDernierTap = 0, zoomMouvement = 0;
+
+        function appliquerZoomImg() {
+            if (zoomImg.scale <= 1) { zoomImg.scale = 1; zoomImg.x = 0; zoomImg.y = 0; }
+            document.getElementById('imgZoomCible').style.transform =
+                `translate(${zoomImg.x}px, ${zoomImg.y}px) scale(${zoomImg.scale})`;
+        }
+
+        function ouvrirZoomImage(src) {
+            if (!src) return;
+            zoomImg = { scale: 1, x: 0, y: 0 };
+            zoomPointers.clear();
+            document.getElementById('imgZoomCible').src = src;
+            appliquerZoomImg();
+            document.getElementById('divZoomImg').classList.remove('hidden');
+        }
+
+        function fermerZoomImage() {
+            document.getElementById('divZoomImg').classList.add('hidden');
+            zoomPointers.clear();
+        }
+
+        (function initZoomImage() {
+            const ov = document.getElementById('divZoomImg');
+
+            ov.addEventListener('pointerdown', e => {
+                if (e.target.tagName === 'BUTTON') return;
+                ov.setPointerCapture(e.pointerId);
+                zoomPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+                if (zoomPointers.size === 1) {
+                    zoomMouvement = 0;
+                } else if (zoomPointers.size === 2) {
+                    const [a, b] = [...zoomPointers.values()];
+                    zoomDistInit = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+                    zoomScaleInit = zoomImg.scale;
+                    zoomMouvement = 99;
+                }
+            });
+
+            ov.addEventListener('pointermove', e => {
+                const p = zoomPointers.get(e.pointerId);
+                if (!p) return;
+                const dx = e.clientX - p.x;
+                const dy = e.clientY - p.y;
+                p.x = e.clientX;
+                p.y = e.clientY;
+
+                if (zoomPointers.size === 2) {
+                    const [a, b] = [...zoomPointers.values()];
+                    const dist = Math.hypot(a.x - b.x, a.y - b.y);
+                    zoomImg.scale = Math.min(8, Math.max(1, zoomScaleInit * dist / zoomDistInit));
+                } else if (zoomPointers.size === 1 && zoomImg.scale > 1) {
+                    zoomImg.x += dx;
+                    zoomImg.y += dy;
+                }
+                zoomMouvement += Math.abs(dx) + Math.abs(dy);
+                appliquerZoomImg();
+            });
+
+            function finTouche(e) {
+                if (!zoomPointers.has(e.pointerId)) return;
+                const etaitUnSeul = zoomPointers.size === 1;
+                zoomPointers.delete(e.pointerId);
+
+                if (etaitUnSeul && zoomMouvement < 10) {
+                    const maintenant = Date.now();
+                    if (maintenant - zoomDernierTap < 300) {
+                        if (zoomImg.scale > 1) zoomImg = { scale: 1, x: 0, y: 0 };
+                        else zoomImg.scale = 2.5;
+                        zoomDernierTap = 0;
+                    } else {
+                        zoomDernierTap = maintenant;
+                    }
+                }
+                appliquerZoomImg();
+            }
+            ov.addEventListener('pointerup', finTouche);
+            ov.addEventListener('pointercancel', finTouche);
+
+            ov.addEventListener('wheel', e => {
+                e.preventDefault();
+                zoomImg.scale = Math.min(8, Math.max(1, zoomImg.scale * (e.deltaY < 0 ? 1.15 : 0.87)));
+                appliquerZoomImg();
+            }, { passive: false });
+        })();
         function ouvrirModalAjoutTache() {
             document.getElementById('inputNouvelleTache').value = '';
             document.getElementById('divAjoutTacheModal').classList.remove('hidden');
