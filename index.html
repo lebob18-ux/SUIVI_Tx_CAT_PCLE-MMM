@@ -1061,53 +1061,172 @@
             rafraichirAffichageTaches();
         });
 
-        function rafraichirAffichageTaches() {
-            containerTaches.innerHTML = '';
-            const chantierChoisi = selectChantier.value;
-            const supportChoisi = selectSupport.value;
-            const filtreTacheTxt = document.getElementById('filtreTachesInput').value.toLowerCase();
+function rafraichirAffichageTaches() {
+    containerTaches.innerHTML = '';
 
-            if (!supportChoisi) {
-                sectionTachesSupport.classList.add('hidden');
-                sectionActionsRapides.classList.add('hidden');
-                sectionFiltreTaches.classList.add('hidden');
-                return;
-            }
+    const chantierChoisi = selectChantier.value;
+    const supportChoisi = selectSupport.value;
+    const filtreTacheTxt = (document.getElementById('filtreTachesInput').value || '').toLowerCase();
 
-            const lignesFiltrees = rawData.filter(r => r.Chantier === chantierChoisi && r.Support === supportChoisi);
-            const lignesVisibles = lignesFiltrees.filter(r => !filtreTacheTxt || r.Tache.toLowerCase().includes(filtreTacheTxt));
+    if (!supportChoisi) {
+        sectionTachesSupport.classList.add('hidden');
+        sectionActionsRapides.classList.add('hidden');
+        sectionFiltreTaches.classList.add('hidden');
+        return;
+    }
 
-            const totalSupport = lignesFiltrees.length;
-            const faitesSupport = lignesFiltrees.filter(r => ['vrai', 'true', '1'].includes(String(r.Fait).toLowerCase().trim())).length;
-            const pctSupport = totalSupport > 0 ? Math.round((faitesSupport / totalSupport) * 100) : 0;
-            document.getElementById('badgeProgressionSupport').innerText = `${faitesSupport} / ${totalSupport} (${pctSupport}%)`;
+    const lignesFiltrees = rawData.filter(r =>
+        r.Chantier === chantierChoisi &&
+        r.Support === supportChoisi
+    );
 
-            lignesVisibles.forEach((item) => {
-                const indexGlobal = rawData.indexOf(item);
-                const isChecked = ['vrai', 'true', '1'].includes(String(item.Fait).toLowerCase().trim());
-                
-                const div = document.createElement('div');
-                div.className = `p-3 border rounded-lg flex flex-col sm:flex-row items-start sm:items-center gap-3 ${item.isCustom ? 'bg-amber-50 border-amber-200' : 'bg-gray-50'}`;
-                div.innerHTML = `
-                    <div class="flex items-center gap-3 w-full sm:w-auto">
-                        <input type="checkbox" ${isChecked ? 'checked' : ''} 
-                            onchange="cocherTache(${indexGlobal}, this)"
-                            class="w-6 h-6 text-blue-600 rounded cursor-pointer shrink-0">
-                        <div class="flex-1 sm:flex-initial text-sm font-medium text-gray-800">
-                            ${item.Tache} ${item.isCustom ? '<span class="text-xs bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded font-bold ml-2">Ajout manuel</span>' : ''}
-                        </div>
-                    </div>
-                    <input type="text" value="${item.Observation || ''}" placeholder="Observation..." 
-                        onchange="modifierLigne(${indexGlobal}, 'Observation', this.value)" 
-                        class="w-full sm:w-1/3 p-1.5 text-sm border rounded bg-white focus:ring-2 focus:ring-blue-500 sm:ml-auto">
-                `;
-                containerTaches.appendChild(div);
-            });
+    const lignesVisibles = lignesFiltrees.filter(r =>
+        !filtreTacheTxt ||
+        String(r.Tache || '').toLowerCase().includes(filtreTacheTxt)
+    );
 
-            sectionTachesSupport.classList.remove('hidden');
-            sectionActionsRapides.classList.remove('hidden');
-            sectionFiltreTaches.classList.remove('hidden');
+    const totalSupport = lignesFiltrees.length;
+
+    const faitesSupport = lignesFiltrees.filter(r =>
+        ['vrai', 'true', '1'].includes(
+            String(r.Fait).toLowerCase().trim()
+        )
+    ).length;
+
+    const pctSupport = totalSupport > 0
+        ? Math.round((faitesSupport / totalSupport) * 100)
+        : 0;
+
+    document.getElementById('badgeProgressionSupport').innerText =
+        `${faitesSupport} / ${totalSupport} (${pctSupport}%)`;
+
+    lignesVisibles.forEach(item => {
+
+        const indexGlobal = rawData.indexOf(item);
+
+        const isChecked = ['vrai', 'true', '1'].includes(
+            String(item.Fait).toLowerCase().trim()
+        );
+
+        const exigeMesures = tacheExigeMesures(item);
+
+        const div = document.createElement('div');
+
+        div.className =
+            `p-3 border rounded-lg flex flex-col gap-3 ${
+                item.isCustom
+                    ? 'bg-amber-50 border-amber-200'
+                    : 'bg-gray-50 border-gray-200'
+            }`;
+
+        /* Ligne supérieure */
+        const ligneTitre = document.createElement('div');
+        ligneTitre.className =
+            'flex items-center gap-3 w-full';
+
+        /* Checkbox */
+        const checkbox = document.createElement('input');
+
+        checkbox.type = 'checkbox';
+        checkbox.checked = isChecked;
+        checkbox.className =
+            'w-6 h-6 text-blue-600 rounded cursor-pointer shrink-0';
+
+        checkbox.addEventListener('change', function () {
+            cocherTache(indexGlobal, this);
+        });
+
+        /* Nom tâche */
+        const nomTache = document.createElement('div');
+        nomTache.className =
+            'flex-1 text-sm font-medium text-gray-800';
+
+        nomTache.innerText = item.Tache || '';
+
+        if (item.isCustom) {
+            const badge = document.createElement('span');
+            badge.className =
+                'text-xs bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded font-bold ml-2';
+
+            badge.innerText = 'Ajout manuel';
+
+            nomTache.appendChild(badge);
         }
+
+        /* Bouton INFO */
+        const boutonInfo = document.createElement('button');
+
+        boutonInfo.type = 'button';
+        boutonInfo.innerHTML = 'ℹ️';
+        boutonInfo.title = 'Informations sur cette tâche';
+
+        boutonInfo.className =
+            'w-9 h-9 flex items-center justify-center rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700 font-bold text-lg shrink-0';
+
+        boutonInfo.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            ouvrirInfoTache(indexGlobal);
+        });
+
+        ligneTitre.appendChild(checkbox);
+        ligneTitre.appendChild(nomTache);
+        ligneTitre.appendChild(boutonInfo);
+
+        /* Indication mesures */
+        if (exigeMesures) {
+            const badgeMesures = document.createElement('span');
+
+            badgeMesures.className =
+                'text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded font-bold shrink-0';
+
+            badgeMesures.innerText =
+                mesuresRemplies(item) ? '📏 Mesures saisies' : '📏 Mesures requises';
+
+            ligneTitre.appendChild(badgeMesures);
+        }
+
+        div.appendChild(ligneTitre);
+
+        /* Hauteur / désaxement déjà enregistrés */
+        if (exigeMesures && mesuresRemplies(item)) {
+
+            const mesures = document.createElement('div');
+
+            mesures.className =
+                'text-xs bg-white border border-purple-200 rounded-lg p-2 text-purple-800';
+
+            mesures.innerHTML =
+                `📏 Hauteur : <b>${item.hauteur} ${UNITE_HAUTEUR}</b>
+                 &nbsp;&nbsp;|&nbsp;&nbsp;
+                 Désaxement : <b>${item.desaxement} ${UNITE_DESAXEMENT}</b>`;
+
+            div.appendChild(mesures);
+        }
+
+        /* Observation */
+        const observation = document.createElement('input');
+
+        observation.type = 'text';
+        observation.value = item.Observation || '';
+        observation.placeholder = 'Observation...';
+
+        observation.className =
+            'w-full p-2 text-sm border rounded bg-white focus:ring-2 focus:ring-blue-500';
+
+        observation.addEventListener('change', function () {
+            modifierLigne(indexGlobal, 'Observation', this.value);
+        });
+
+        div.appendChild(observation);
+
+        containerTaches.appendChild(div);
+    });
+
+    sectionTachesSupport.classList.remove('hidden');
+    sectionActionsRapides.classList.remove('hidden');
+    sectionFiltreTaches.classList.remove('hidden');
+}
 
         async function cocherToutSupport(etatVoulu) {
             const chantierChoisi = selectChantier.value;
@@ -1222,10 +1341,19 @@
             return String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
         }
 
-        function tacheExigeMesures(item) {
-            const t = normaliserTexte(item.Tache);
-            return t.includes('hauteur') && t.includes('desaxement');
-        }
+function tacheExigeMesures(item) {
+
+    const texte = normaliserTexte(item.Tache);
+
+    const contientHauteur =
+        texte.includes('hauteur');
+
+    const contientDesaxement =
+        texte.includes('desaxement') ||
+        texte.includes('desaxe');
+
+    return contientHauteur && contientDesaxement;
+}
 
         function valeurRenseignee(v) {
             return v !== null && v !== undefined && v !== '';
@@ -1246,18 +1374,95 @@
             modifierLigne(index, 'Fait', checkbox.checked);
         }
 
-        function ouvrirModalMesures(index) {
-            indexMesuresEnCours = index;
-            const item = rawData[index];
-            document.getElementById('uniteHauteurLabel').innerText = UNITE_HAUTEUR;
-            document.getElementById('uniteDesaxementLabel').innerText = UNITE_DESAXEMENT;
-            document.getElementById('mesuresSupport').innerText = `${item.Support || ''} — ${item.Tache || ''}`;
-            document.getElementById('inputHauteur').value = valeurRenseignee(item.hauteur) ? item.hauteur : '';
-            document.getElementById('inputDesaxement').value = valeurRenseignee(item.desaxement) ? item.desaxement : '';
-            document.getElementById('mesuresErreur').classList.add('hidden');
-            document.getElementById('divMesuresModal').classList.remove('hidden');
-            setTimeout(() => document.getElementById('inputHauteur').focus(), 50);
-        }
+function ouvrirModalMesures(index) {
+
+    indexMesuresEnCours = index;
+
+    const item = rawData[index];
+
+    document.getElementById('uniteHauteurLabel').innerText =
+        UNITE_HAUTEUR;
+
+    document.getElementById('uniteDesaxementLabel').innerText =
+        UNITE_DESAXEMENT;
+
+    document.getElementById('mesuresSupport').innerText =
+        `${item.Support || ''} — ${item.Tache || ''}`;
+
+    document.getElementById('inputHauteur').value =
+        valeurRenseignee(item.hauteur)
+            ? item.hauteur
+            : '';
+
+    document.getElementById('inputDesaxement').value =
+        valeurRenseignee(item.desaxement)
+            ? item.desaxement
+            : '';
+
+    document.getElementById('mesuresErreur').classList.add('hidden');
+
+    const modal = document.getElementById('divMesuresModal');
+
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+
+    setTimeout(() => {
+        document.getElementById('inputHauteur').focus();
+    }, 100);
+}
+
+
+function fermerModalMesures() {
+
+    const modal = document.getElementById('divMesuresModal');
+
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+
+    indexMesuresEnCours = null;
+}
+
+
+async function validerMesures() {
+
+    if (indexMesuresEnCours === null) {
+        return;
+    }
+
+    const inputH =
+        document.getElementById('inputHauteur').value
+        .replace(',', '.')
+        .trim();
+
+    const inputD =
+        document.getElementById('inputDesaxement').value
+        .replace(',', '.')
+        .trim();
+
+    const h = parseFloat(inputH);
+    const d = parseFloat(inputD);
+
+    if (isNaN(h) || isNaN(d)) {
+
+        document.getElementById('mesuresErreur').innerText =
+            '⚠️ La hauteur et le désaxement sont obligatoires.';
+
+        document.getElementById('mesuresErreur')
+            .classList.remove('hidden');
+
+        return;
+    }
+
+    const index = indexMesuresEnCours;
+
+    fermerModalMesures();
+
+    await modifierLigneMulti(index, {
+        Fait: true,
+        hauteur: h,
+        desaxement: d
+    });
+}
 
         async function validerMesures() {
             const h = parseFloat(document.getElementById('inputHauteur').value);
