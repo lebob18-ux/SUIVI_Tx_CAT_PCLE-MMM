@@ -1091,7 +1091,7 @@
                 div.innerHTML = `
                     <div class="flex items-center gap-3 w-full sm:w-auto">
                         <input type="checkbox" ${isChecked ? 'checked' : ''} 
-                            onchange="modifierLigne(${indexGlobal}, 'Fait', this.checked)" 
+                            onchange="cocherTache(${indexGlobal}, this)"
                             class="w-6 h-6 text-blue-600 rounded cursor-pointer shrink-0">
                         <div class="flex-1 sm:flex-initial text-sm font-medium text-gray-800">
                             ${item.Tache} ${item.isCustom ? '<span class="text-xs bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded font-bold ml-2">Ajout manuel</span>' : ''}
