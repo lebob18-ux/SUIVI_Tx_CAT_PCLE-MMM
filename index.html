@@ -662,15 +662,32 @@
         <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-sm">
 
             <p class="font-bold text-lg mb-2 text-gray-800 text-center">
-                ➕ Ajouter un travail non prévu
+                ➕ Travail non prévu ou oublié
             </p>
 
             <p class="text-xs text-gray-600 mb-4 text-center">
-                Ce travail sera enregistré localement et synchronisé dès le retour du réseau.
+                Enregistré localement et synchronisé dès le retour du réseau.
             </p>
 
             <label class="block text-xs font-bold uppercase text-gray-600 mb-1">
-                Intitulé de la tâche :
+                Tâche déjà créée sur ce chantier :
+            </label>
+
+            <select id="selectTacheExistante"
+                    onchange="choisirTacheExistante()"
+                    class="w-full p-2.5 border rounded-lg mb-3 text-sm bg-white">
+            </select>
+
+            <label class="block text-xs font-bold uppercase text-gray-600 mb-1">
+                Chapitre :
+            </label>
+
+            <select id="selectTypeNouvelleTache"
+                    class="w-full p-2.5 border rounded-lg mb-3 text-sm bg-white">
+            </select>
+
+            <label class="block text-xs font-bold uppercase text-gray-600 mb-1">
+                Intitulé (ou saisir une nouvelle tâche) :
             </label>
 
             <input type="text"
@@ -2601,7 +2618,103 @@ function mesuresRemplies(item) {
     );
 }
 
+/* ============================================================
+   CHAPITRES (colonne type)
+============================================================ */
 
+const ORDRE_CHAPITRES = ['gc', 'depose', 'pose'];
+
+const LIBELLES_CHAPITRES = {
+    gc: '🧱 GC',
+    depose: '🔧 Dépose',
+    pose: '🔩 Pose',
+    autres: '📋 Autres'
+};
+
+const chapitresOuverts = new Set();
+let chapitresCourants = {};
+let chapitresForcerOuvert = false;
+
+function cleChapitre(item) {
+    return normaliserTexte(item.type).trim() || 'autres';
+}
+
+function rangChapitre(cle) {
+    const i = ORDRE_CHAPITRES.indexOf(cle);
+    return i === -1 ? 99 : i;
+}
+
+function ajouterDansChapitre(item, div) {
+
+    const cle = cleChapitre(item);
+
+    if (!chapitresCourants[cle]) {
+
+        const chantier = selectChantier.value;
+        const support = selectSupport.value;
+        const cleOuverture = `${chantier}||${support}||${cle}`;
+
+        const lignesChapitre = rawData.filter(
+            r =>
+                r.Chantier === chantier &&
+                r.Support === support &&
+                cleChapitre(r) === cle
+        );
+
+        const faites = lignesChapitre.filter(
+            r =>
+                ['vrai', 'true', '1'].includes(
+                    String(r.Fait).toLowerCase().trim()
+                )
+        ).length;
+
+        const ouvert =
+            chapitresForcerOuvert ||
+            chapitresOuverts.has(cleOuverture);
+
+        const bloc = document.createElement('div');
+        bloc.className = 'border rounded-xl overflow-hidden bg-white shadow-sm';
+
+        const entete = document.createElement('button');
+        entete.type = 'button';
+        entete.className = 'w-full flex items-center justify-between gap-2 p-3 bg-gray-100 hover:bg-gray-200 text-left';
+        entete.innerHTML = `
+            <span class="titre font-bold text-sm text-gray-800"></span>
+            <span class="flex items-center gap-2">
+                <span class="text-xs font-bold px-2 py-0.5 rounded-full text-white ${faites === lignesChapitre.length ? 'bg-green-600' : 'bg-blue-600'}">${faites} / ${lignesChapitre.length}</span>
+                <span class="fleche text-gray-600">${ouvert ? '▴' : '▾'}</span>
+            </span>`;
+
+        entete.querySelector('.titre').textContent =
+            LIBELLES_CHAPITRES[cle] ||
+            `📋 ${String(item.type || '').trim()}`;
+
+        const corps = document.createElement('div');
+        corps.className = `p-3 space-y-3 ${ouvert ? '' : 'hidden'}`;
+
+        entete.onclick = () => {
+
+            const masque = corps.classList.toggle('hidden');
+
+            if (masque) {
+                chapitresOuverts.delete(cleOuverture);
+            } else {
+                chapitresOuverts.add(cleOuverture);
+            }
+
+            entete.querySelector('.fleche').innerText =
+                masque ? '▾' : '▴';
+        };
+
+        bloc.appendChild(entete);
+        bloc.appendChild(corps);
+        containerTaches.appendChild(bloc);
+
+        chapitresCourants[cle] = corps;
+    }
+
+    chapitresCourants[cle].appendChild(div);
+}
 /* ============================================================
    AFFICHAGE TÂCHES
 ============================================================ */
@@ -2697,7 +2810,17 @@ function rafraichirAffichageTaches() {
         'badgeProgressionSupport'
     ).innerText =
         `${faites} / ${total} (${pct}%)`;
+    chapitresCourants = {};
 
+    chapitresForcerOuvert =
+        !!filtre ||
+        new Set(lignes.map(cleChapitre)).size === 1;
+
+    visibles.sort(
+        (a, b) =>
+            rangChapitre(cleChapitre(a)) - rangChapitre(cleChapitre(b)) ||
+            cleChapitre(a).localeCompare(cleChapitre(b))
+    );
 
     visibles.forEach(
         item => {
@@ -2944,7 +3067,8 @@ function rafraichirAffichageTaches() {
                 observation
             );
 
-            containerTaches.appendChild(
+            ajouterDansChapitre(
+                item,
                 div
             );
         }
@@ -3915,17 +4039,7 @@ function appliquerZoomImg() {
    AJOUT TÂCHE MANUELLE
 ============================================================ */
 
-function ouvrirModalAjoutTache() {
 
-    document.getElementById(
-        'inputNouvelleTache'
-    ).value =
-        '';
-
-    ouvrirModal(
-        'divAjoutTacheModal'
-    );
-}
 
 
 /*
@@ -3973,6 +4087,8 @@ function enregistrerInsertionFileAttente(
 
             Tache:
                 ligne.Tache,
+            type:
+                ligne.type,
 
             Fait:
                 ligne.Fait,
@@ -4001,152 +4117,230 @@ function enregistrerInsertionFileAttente(
 }
 
 
+/* ============================================================
+   AJOUT TÂCHE MANUELLE (chapitre + tâches existantes)
+============================================================ */
+
+let tachesExistantesModal = [];
+
+function typesDisponibles() {
+
+    const vus = new Map();
+
+    rawData.forEach(
+        r => {
+
+            const t = String(r.type || '').trim();
+
+            if (t && !vus.has(normaliserTexte(t))) {
+                vus.set(normaliserTexte(t), t);
+            }
+        }
+    );
+
+    ['GC', 'Dépose', 'Pose'].forEach(
+        t => {
+
+            if (!vus.has(normaliserTexte(t))) {
+                vus.set(normaliserTexte(t), t);
+            }
+        }
+    );
+
+    return [...vus.entries()]
+        .sort((a, b) => rangChapitre(a[0]) - rangChapitre(b[0]))
+        .map(e => e[1]);
+}
+
+
+function ouvrirModalAjoutTache() {
+
+    const chantier = selectChantier.value;
+    const support = selectSupport.value;
+
+    /* Chapitres */
+    const selType = document.getElementById('selectTypeNouvelleTache');
+    selType.innerHTML = '';
+    typesDisponibles().forEach(t => selType.add(new Option(t, t)));
+
+    /* Tâches du chantier absentes de ce support */
+    const deja = new Set(
+        rawData
+            .filter(r => r.Chantier === chantier && r.Support === support)
+            .map(r => cleChapitre(r) + '|' + normaliserTexte(r.Tache).trim())
+    );
+
+    const vus = new Set();
+    tachesExistantesModal = [];
+
+    rawData
+        .filter(r => r.Chantier === chantier && r.Tache)
+        .forEach(
+            r => {
+
+                const cle = cleChapitre(r) + '|' + normaliserTexte(r.Tache).trim();
+
+                if (deja.has(cle) || vus.has(cle)) return;
+
+                vus.add(cle);
+
+                tachesExistantesModal.push({
+                    type: String(r.type || '').trim(),
+                    tache: String(r.Tache).trim(),
+                    cle: cleChapitre(r)
+                });
+            }
+        );
+
+    tachesExistantesModal.sort(
+        (a, b) =>
+            rangChapitre(a.cle) - rangChapitre(b.cle) ||
+            a.tache.localeCompare(b.tache, 'fr', { numeric: true })
+    );
+
+    const sel = document.getElementById('selectTacheExistante');
+    sel.innerHTML = '<option value="">— Choisir une tâche existante —</option>';
+
+    let groupe = null;
+    let cleGroupe = null;
+
+    tachesExistantesModal.forEach(
+        (t, i) => {
+
+            if (t.cle !== cleGroupe) {
+
+                groupe = document.createElement('optgroup');
+                groupe.label = LIBELLES_CHAPITRES[t.cle] || t.type || 'Autres';
+                sel.appendChild(groupe);
+                cleGroupe = t.cle;
+            }
+
+            groupe.appendChild(new Option(t.tache, String(i)));
+        }
+    );
+
+    document.getElementById('inputNouvelleTache').value = '';
+
+    ouvrirModal('divAjoutTacheModal');
+}
+
+
+function choisirTacheExistante() {
+
+    const v = document.getElementById('selectTacheExistante').value;
+
+    if (v === '') return;
+
+    const t = tachesExistantesModal[Number(v)];
+
+    document.getElementById('inputNouvelleTache').value = t.tache;
+
+    const selType = document.getElementById('selectTypeNouvelleTache');
+
+    const option = [...selType.options].find(
+        o => normaliserTexte(o.value) === t.cle
+    );
+
+    if (option) selType.value = option.value;
+}
+
+
 async function validerAjoutTacheManuelle() {
 
-    const intitule =
-        document.getElementById(
-            'inputNouvelleTache'
-        ).value.trim();
+    const intitule = document.getElementById('inputNouvelleTache').value.trim();
+    const typeChoisi = document.getElementById('selectTypeNouvelleTache').value;
 
     if (!intitule) {
 
-        alert(
-            "Veuillez saisir un intitulé."
-        );
+        alert("Veuillez saisir ou choisir un intitulé.");
+
+        return;
+    }
+
+    const existeDeja = rawData.some(
+        r =>
+            r.Chantier === selectChantier.value &&
+            r.Support === selectSupport.value &&
+            cleChapitre(r) === normaliserTexte(typeChoisi).trim() &&
+            normaliserTexte(r.Tache).trim() === normaliserTexte(intitule).trim()
+    );
+
+    if (existeDeja) {
+
+        alert("Cette tâche existe déjà dans ce support et ce chapitre.");
 
         return;
     }
 
     const nouvelleLigne = {
-
-        Chantier:
-            selectChantier.value,
-
-        Support:
-            selectSupport.value,
-
-        Tache:
-            intitule,
-
-        Fait:true,
-
-        Observation:
-            "Travail non prévu ajouté manuellement",
-
-        nom:
-            userName,
-
-        prenom:
-            userPrenom,
-
-        isCustom:true,
-
-        modifie:true
+        Chantier: selectChantier.value,
+        Support: selectSupport.value,
+        Tache: intitule,
+        type: typeChoisi,
+        Fait: true,
+        Observation: "Travail non prévu ajouté manuellement",
+        nom: userName,
+        prenom: userPrenom,
+        isCustom: true,
+        modifie: true
     };
-
 
     if (estEnLigne) {
 
         try {
 
-            const {
-                data,
-                error
-            } =
+            const { data, error } =
                 await supabaseClient
                     .from('suivi_tx_cat_V2')
                     .insert([{
-
-                        Chantier:
-                            nouvelleLigne.Chantier,
-
-                        Support:
-                            nouvelleLigne.Support,
-
-                        Tache:
-                            nouvelleLigne.Tache,
-
-                        Fait:
-                            nouvelleLigne.Fait,
-
-                        Observation:
-                            nouvelleLigne.Observation,
-
-                        nom:
-                            nouvelleLigne.nom,
-
-                        prenom:
-                            nouvelleLigne.prenom
-
+                        Chantier: nouvelleLigne.Chantier,
+                        Support: nouvelleLigne.Support,
+                        Tache: nouvelleLigne.Tache,
+                        type: nouvelleLigne.type,
+                        Fait: nouvelleLigne.Fait,
+                        Observation: nouvelleLigne.Observation,
+                        nom: nouvelleLigne.nom,
+                        prenom: nouvelleLigne.prenom
                     }])
                     .select('*');
 
-            if (error)
-                throw error;
+            if (error) throw error;
 
-            if (
-                data &&
-                data.length === 1
-            ) {
-
-                Object.assign(
-                    nouvelleLigne,
-                    data[0]
-                );
-
-                nouvelleLigne.isCustom =
-                    true;
-
-                nouvelleLigne.modifie =
-                    true;
-
-            } else {
-
-                throw new Error(
-                    "Insertion non confirmée."
-                );
+            if (!data || data.length !== 1) {
+                throw new Error("Insertion non confirmée.");
             }
+
+            Object.assign(nouvelleLigne, data[0]);
+            nouvelleLigne.isCustom = true;
+            nouvelleLigne.modifie = true;
 
         } catch (err) {
 
-            console.error(
-                err
-            );
+            console.error(err);
 
-            logDiag(
-                `❌ Insertion impossible : ${err.message || err}`
-            );
+            logDiag(`❌ Insertion impossible : ${err.message || err}`);
 
-            /*
-             * La ligne est quand même affichée
-             * localement et sera insérée plus tard.
-             */
-            nouvelleLigne._insertionLocale =
-                true;
+            nouvelleLigne._insertionLocale = true;
 
-            enregistrerInsertionFileAttente(
-                nouvelleLigne
-            );
+            enregistrerInsertionFileAttente(nouvelleLigne);
         }
 
     } else {
 
-        nouvelleLigne._insertionLocale =
-            true;
+        nouvelleLigne._insertionLocale = true;
 
-        enregistrerInsertionFileAttente(
-            nouvelleLigne
-        );
+        enregistrerInsertionFileAttente(nouvelleLigne);
     }
 
-    rawData.push(
-        nouvelleLigne
-    );
+    rawData.push(nouvelleLigne);
 
     sauvegarderCacheLocal();
 
-    fermerModal(
-        'divAjoutTacheModal'
+    fermerModal('divAjoutTacheModal');
+
+    /* On ouvre le chapitre pour voir la tâche ajoutée */
+    chapitresOuverts.add(
+        `${selectChantier.value}||${selectSupport.value}||${cleChapitre(nouvelleLigne)}`
     );
 
     rafraichirAffichageTaches();
