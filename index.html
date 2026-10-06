@@ -899,7 +899,7 @@
    CONFIGURATION
 ============================================================ */
 
-const APP_NAME = "suivi_tx_cat_V2";
+const APP_NAME = "suivi_tx_cat_V3";
 const CACHE_KEY = `cache_${APP_NAME}`;
 const FILE_ATTENTE_KEY = "file_attente_sutx";
 
@@ -1192,7 +1192,7 @@ async function chargerDonneesSupabase() {
                 error
             } =
                 await supabaseClient
-                    .from('suivi_tx_cat_V2')
+                    .from('suivi_tx_cat_V3')
                     .select('*');
 
             if (error)
@@ -3348,7 +3348,7 @@ async function envoyerModificationSupabase(
         error
     } =
         await supabaseClient
-            .from('suivi_tx_cat_V2')
+            .from('suivi_tx_cat_V3')
             .update(updateData)
             .eq(
                 'id',
@@ -4291,7 +4291,7 @@ async function validerAjoutTacheManuelle() {
 
             const { data, error } =
                 await supabaseClient
-                    .from('suivi_tx_cat_V2')
+                    .from('suivi_tx_cat_V3')
                     .insert([{
                         Chantier: nouvelleLigne.Chantier,
                         Support: nouvelleLigne.Support,
@@ -4360,7 +4360,7 @@ async function synchroniserInsertion(
         error
     } =
         await supabaseClient
-            .from('suivi_tx_cat_V2')
+            .from('suivi_tx_cat_V3')
             .insert([
                 action.data
             ])
