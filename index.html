@@ -1185,7 +1185,7 @@ async function chargerToutesLesLignes() {
 
         const { data, error } =
             await supabaseClient
-                .from('TABLE_SUPABASE')
+                .from(TABLE_SUPABASE)
                 .select('*')
                 .order('id', { ascending: true })
                 .range(debut, debut + taille - 1);
@@ -3491,7 +3491,7 @@ async function envoyerModificationSupabase(
         error
     } =
         await supabaseClient
-            .from('TABLE_SUPABASE')
+            .from(TABLE_SUPABASE)
             .update(updateData)
             .eq(
                 'id',
@@ -4371,7 +4371,7 @@ async function validerAjoutTacheManuelle() {
 
             const { data, error } =
                 await supabaseClient
-                    .from('TABLE_SUPABASE')
+                    .from(TABLE_SUPABASE)
                     .insert([{
                         Chantier: nouvelleLigne.Chantier,
                         Support: nouvelleLigne.Support,
@@ -4440,7 +4440,7 @@ async function synchroniserInsertion(
         error
     } =
         await supabaseClient
-            .from('TABLE_SUPABASE')
+            .from(TABLE_SUPABASE)
             .insert([
                 action.data
             ])
