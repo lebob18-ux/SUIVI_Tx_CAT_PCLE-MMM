@@ -816,7 +816,16 @@
     <!-- ========================================================= -->
     <!-- MODALE INFO -->
     <!-- ========================================================= -->
-
+    <div id="divChoixModal"
+         class="app-modal fixed inset-0 bg-black bg-opacity-60 items-center justify-center z-[1500] p-4">
+        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
+            <p id="choixTitre" class="font-bold text-lg mb-1 text-gray-800 text-center"></p>
+            <p id="choixSousTitre" class="text-xs text-gray-500 mb-4 text-center"></p>
+            <div id="choixBoutons" class="flex flex-wrap gap-3 mb-4"></div>
+            <button type="button" onclick="fermerChoix()"
+                    class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 p-2.5 rounded-lg font-bold text-sm">❌ Annuler</button>
+        </div>
+    </div>
     <div id="divInfoModal"
          class="app-modal fixed inset-0 bg-black bg-opacity-60 items-center justify-center z-[1400] p-3">
 
@@ -824,72 +833,43 @@
              style="max-height:92vh;">
 
             <div class="flex items-start justify-between gap-3 p-4 border-b">
-
-                <h3 id="infoTitre"
-                    class="font-bold text-base text-gray-800">
-                </h3>
-
-                <button type="button"
-                        onclick="fermerInfoTache()"
-                        class="text-3xl leading-none text-gray-500">
-                    &times;
-                </button>
-
+                <h3 id="infoTitre" class="font-bold text-base text-gray-800"></h3>
+                <button type="button" onclick="fermerInfoTache()"
+                        class="text-3xl leading-none text-gray-500">&times;</button>
             </div>
 
             <div class="p-4 overflow-y-auto space-y-4">
 
-                <p id="infoTexte"
-                   class="text-sm text-gray-700 whitespace-pre-wrap">
-                </p>
+                <p id="infoTexte" class="text-sm text-gray-700 whitespace-pre-wrap"></p>
 
                 <div id="infoImgZone" class="hidden">
-
-                    <p class="text-xs text-gray-500 mb-1">
-                        Touchez la miniature pour zoomer :
-                    </p>
-
+                    <p class="text-xs text-gray-500 mb-1">Touchez la miniature pour zoomer :</p>
                     <img id="infoImgMini"
                          alt="Miniature"
                          onclick="ouvrirZoomImage(this.src)"
                          class="w-full max-h-72 object-contain rounded-lg border bg-gray-50 cursor-zoom-in">
+                </div>
 
+                <div>
+                    <label class="block text-xs font-bold uppercase text-gray-600 mb-1">
+                        📝 Observation :
+                    </label>
+                    <textarea id="infoObservation"
+                              rows="3"
+                              placeholder="Observation..."
+                              class="w-full p-2.5 border rounded-lg text-sm"></textarea>
                 </div>
 
             </div>
 
             <div class="p-3 border-t">
-
-                <button type="button"
-                        onclick="fermerInfoTache()"
-                        class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 p-2.5 rounded-lg font-bold text-sm">
-                    Fermer
+                <button type="button" onclick="fermerInfoTache()"
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white p-2.5 rounded-lg font-bold text-sm">
+                    💾 Enregistrer et fermer
                 </button>
-
             </div>
 
         </div>
-
-    </div>
-
-    <div id="divZoomImg"
-         class="hidden fixed inset-0 bg-black items-center justify-center"
-         style="z-index:2000;touch-action:none;">
-
-        <img id="imgZoomCible"
-             alt=""
-             draggable="false"
-             style="max-width:100%;max-height:100%;user-select:none;-webkit-user-drag:none;">
-
-        <button type="button"
-                onclick="fermerZoomImage()"
-                class="absolute top-3 right-3 bg-white text-gray-800 w-10 h-10 rounded-full font-bold text-xl shadow">
-            &times;
-        </button>
-
-        <p class="absolute bottom-3 left-0 right-0 text-center text-xs text-gray-300 pointer-events-none">
-            Pincer pour zoomer • double tap pour agrandir
-        </p>
 
     </div>
 
@@ -2943,7 +2923,7 @@ function rafraichirAffichageTaches() {
                 'button';
 
             boutonInfo.innerText =
-                'ℹ️';
+            String(item.Observation || '').trim() ? '📝' : 'ℹ️';
 
             boutonInfo.title =
                 'Informations sur cette tâche';
@@ -2976,7 +2956,27 @@ function rafraichirAffichageTaches() {
             ligne.appendChild(
                 boutonInfo
             );
+            if (tacheExigeQt(item)) {
 
+                const badgeQt = document.createElement('button');
+                badgeQt.type = 'button';
+                badgeQt.className = 'text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded font-bold shrink-0';
+                badgeQt.innerText = `🔢 ${valeurRenseignee(item.qt_realisee) ? item.qt_realisee : '?'} / ${qtMax(item)}`;
+                badgeQt.addEventListener('click', () => ouvrirChoix(rowId, 'qt'));
+
+                ligne.appendChild(badgeQt);
+            }
+
+            if (tacheExigeBRH(item)) {
+
+                const badgeBrh = document.createElement('button');
+                badgeBrh.type = 'button';
+                badgeBrh.className = 'text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded font-bold shrink-0';
+                badgeBrh.innerText = `🔨 BRH : ${item.brh === true ? 'Oui' : item.brh === false ? 'Non' : '?'}`;
+                badgeBrh.addEventListener('click', () => ouvrirChoix(rowId, 'brh'));
+
+                ligne.appendChild(badgeBrh);
+            }
 
             /* BADGE MESURES */
 
@@ -3096,49 +3096,182 @@ function rafraichirAffichageTaches() {
    COCHER TÂCHE
 ============================================================ */
 
-function cocherTache(
-    id,
-    checkbox
-) {
+/* ============================================================
+   BRH / QUANTITÉS / COCHER / INFO + OBSERVATION
+============================================================ */
 
-    const item =
-        trouverLigneParId(
-            id
-        );
+const QT_MAX_BOUTONS = 10;
+
+let choixEnCours = null;
+let infoIdEnCours = null;
+
+function tacheExigeBRH(item) {
+    const t = normaliserTexte(item.Tache);
+    return t.includes('brh') || t.includes('demolition');
+}
+
+function qtMax(item) {
+    const q = parseFloat(String(item.qt_prevu).replace(',', '.'));
+    return isNaN(q) ? 0 : Math.min(QT_MAX_BOUTONS, Math.floor(q));
+}
+
+function tacheExigeQt(item) {
+    return qtMax(item) > 1;
+}
+
+function saisiesManquantes(item) {
+    if (tacheExigeBRH(item) && (item.brh === null || item.brh === undefined)) return true;
+    if (tacheExigeQt(item) && !(parseFloat(item.qt_realisee) >= qtMax(item))) return true;
+    return false;
+}
+
+function ouvrirChoix(id, type) {
+
+    const item = trouverLigneParId(id);
+    if (!item) return;
+
+    let titre, options;
+
+    if (type === 'brh') {
+        titre = '🔨 BRH utilisé ?';
+        options = [{ label: '✅ Oui', val: true }, { label: '❌ Non', val: false }];
+    } else {
+        titre = '🔢 Quantité réalisée';
+        options = [];
+        for (let n = 1; n <= qtMax(item); n++) options.push({ label: String(n), val: n });
+    }
+
+    choixEnCours = { id, type, options };
+
+    document.getElementById('choixTitre').innerText = titre;
+    document.getElementById('choixSousTitre').innerText = `${item.Support || ''} — ${item.Tache || ''}`;
+    document.getElementById('choixBoutons').innerHTML = options.map((o, i) =>
+        `<button type="button" onclick="validerChoix(${i})"
+                 class="flex-1 min-w-[4rem] bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl font-bold text-xl shadow">${o.label}</button>`
+    ).join('');
+
+    ouvrirModal('divChoixModal');
+}
+
+function fermerChoix() {
+    fermerModal('divChoixModal');
+    choixEnCours = null;
+}
+
+async function validerChoix(i) {
+
+    if (!choixEnCours) return;
+
+    const { id, type, options } = choixEnCours;
+    const item = trouverLigneParId(id);
+    if (!item) return;
+
+    const val = options[i].val;
+
+    fermerChoix();
+
+    if (type === 'brh') {
+
+        if (tacheExigeQt(item) && !(parseFloat(item.qt_realisee) >= qtMax(item))) {
+            await modifierLigneMulti(id, { brh: val });
+            ouvrirChoix(id, 'qt');
+            return;
+        }
+
+        await modifierLigneMulti(id, { brh: val, Fait: true });
+
+    } else {
+
+        await modifierLigneMulti(id, { qt_realisee: val, Fait: val >= qtMax(item) });
+    }
+}
+
+function cocherTache(id, checkbox) {
+
+    const item = trouverLigneParId(id);
 
     if (!item) {
 
-        console.error(
-            "Ligne introuvable pour ID :",
-            id
+        checkbox.checked = !checkbox.checked;
+
+        logDiag(
+            `❌ Coche impossible : ligne introuvable pour id = ${JSON.stringify(id)} ` +
+            `(lignes chargées : ${rawData.length}, lignes sans id : ${rawData.filter(r => r.id === null || r.id === undefined).length})`
         );
 
-        checkbox.checked =
-            !checkbox.checked;
+        afficherPopupDiagnostic();
 
         return;
     }
 
-    if (
-        checkbox.checked &&
-        tacheExigeMesures(item)
-    ) {
+    if (checkbox.checked && tacheExigeMesures(item)) {
+        checkbox.checked = false;
+        ouvrirModalMesures(id);
+        return;
+    }
 
-        checkbox.checked =
-            false;
+    if (checkbox.checked && tacheExigeBRH(item)) {
+        checkbox.checked = false;
+        ouvrirChoix(id, 'brh');
+        return;
+    }
 
-        ouvrirModalMesures(
-            id
-        );
+    if (checkbox.checked && tacheExigeQt(item)) {
+        checkbox.checked = false;
+        ouvrirChoix(id, 'qt');
+        return;
+    }
+
+    modifierLigne(id, 'Fait', checkbox.checked);
+}
+
+function ouvrirInfoTache(id) {
+
+    const item = trouverLigneParId(id);
+
+    if (!item) {
+
+        logDiag(`❌ Info impossible : ligne introuvable pour id = ${JSON.stringify(id)}`);
+
+        afficherPopupDiagnostic();
 
         return;
     }
 
-    modifierLigne(
-        id,
-        'Fait',
-        checkbox.checked
-    );
+    infoIdEnCours = id;
+
+    document.getElementById('infoTitre').innerText = item.Tache || 'Information';
+    document.getElementById('infoTexte').innerText = item.info || 'Aucune information disponible.';
+    document.getElementById('infoObservation').value = item.Observation || '';
+
+    const zone = document.getElementById('infoImgZone');
+    const image = document.getElementById('infoImgMini');
+
+    if (item.img) {
+        image.src = item.img;
+        zone.classList.remove('hidden');
+    } else {
+        image.removeAttribute('src');
+        zone.classList.add('hidden');
+    }
+
+    ouvrirModal('divInfoModal');
+}
+
+function fermerInfoTache() {
+
+    const id = infoIdEnCours;
+    const valeur = document.getElementById('infoObservation').value.trim();
+
+    infoIdEnCours = null;
+
+    fermerModal('divInfoModal');
+
+    const item = trouverLigneParId(id);
+
+    if (item && valeur !== String(item.Observation || '').trim()) {
+        modifierLigne(id, 'Observation', valeur);
+    }
 }
 
 
@@ -3901,70 +4034,9 @@ async function verifierEtSynchroniserFileAttente() {
    INFO TÂCHE
 ============================================================ */
 
-function ouvrirInfoTache(id) {
-
-    const item =
-        trouverLigneParId(
-            id
-        );
-
-    if (!item)
-        return;
-
-    document.getElementById(
-        'infoTitre'
-    ).innerText =
-        item.Tache ||
-        'Information';
-
-    document.getElementById(
-        'infoTexte'
-    ).innerText =
-        item.info ||
-        'Aucune information disponible.';
-
-    const zone =
-        document.getElementById(
-            'infoImgZone'
-        );
-
-    const image =
-        document.getElementById(
-            'infoImgMini'
-        );
-
-    if (item.img) {
-
-        image.src =
-            item.img;
-
-        zone.classList.remove(
-            'hidden'
-        );
-
-    } else {
-
-        image.removeAttribute(
-            'src'
-        );
-
-        zone.classList.add(
-            'hidden'
-        );
-    }
-
-    ouvrirModal(
-        'divInfoModal'
-    );
-}
 
 
-function fermerInfoTache() {
 
-    fermerModal(
-        'divInfoModal'
-    );
-}
 
 
 /* ============================================================
@@ -4450,11 +4522,12 @@ async function cocherToutSupport(
                 support
         )
             continue;
-
         if (
             etat &&
-            tacheExigeMesures(item) &&
-            !mesuresRemplies(item)
+            (
+                (tacheExigeMesures(item) && !mesuresRemplies(item)) ||
+                saisiesManquantes(item)
+            )
         ) {
 
             ignorees++;
@@ -4543,7 +4616,7 @@ async function cocherToutSupport(
     if (ignorees) {
 
         alert(
-            `⚠️ ${ignorees} tâche(s) nécessitent d'abord la saisie de la hauteur et du désaxement.`
+           `⚠️ ${ignorees} tâche(s) nécessitent d'abord une saisie (mesures, BRH ou quantité).
         );
     }
 }
