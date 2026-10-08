@@ -4621,215 +4621,288 @@ async function cocherToutSupport(
    ADMIN
 ============================================================ */
 
+/* ============================================================
+   ADMIN (avancement par type)
+============================================================ */
+
+let adminFiltreType = 'all';
+const adminOuverts = new Set();
+
+function estFait(r) {
+    return ['vrai', 'true', '1'].includes(String(r.Fait).toLowerCase().trim());
+}
+
+function escHtml(t) {
+    return String(t ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function statsLignes(l) {
+    const t = l.length;
+    const f = l.filter(estFait).length;
+    return { t, f, p: t ? Math.round(f / t * 100) : 0 };
+}
+
+function couleurPct(p) {
+    return p >= 100 ? '#16a34a' : p >= 50 ? '#2563eb' : p > 0 ? '#f59e0b' : '#9ca3af';
+}
+
+function barreHtml(p, h) {
+    return `<div class="w-full bg-gray-200 rounded-full ${h} overflow-hidden">
+                <div class="${h} rounded-full" style="width:${p}%;background:${couleurPct(p)}"></div>
+            </div>`;
+}
+
+function libelleType(cle) {
+    if (cle === 'all') return 'Tous';
+    const brut = (rawData.find(r => cleChapitre(r) === cle) || {}).type;
+    return LIBELLES_CHAPITRES[cle] || `📋 ${String(brut || 'Autres').trim()}`;
+}
+
+function trierTypes(liste) {
+    return liste.sort((a, b) => rangChapitre(a) - rangChapitre(b) || a.localeCompare(b));
+}
+
+function blocRepliable(cle, enteteHtml, corps, classes) {
+
+    const bloc = document.createElement('div');
+    bloc.className = classes;
+
+    const entete = document.createElement('div');
+    entete.className = 'cursor-pointer select-none';
+    entete.innerHTML = enteteHtml;
+
+    const fleche = entete.querySelector('.fleche');
+    const ouvert = adminOuverts.has(cle);
+
+    corps.classList.toggle('hidden', !ouvert);
+    if (fleche) fleche.textContent = ouvert ? '▴' : '▾';
+
+    entete.onclick = () => {
+
+        const masque = corps.classList.toggle('hidden');
+
+        if (masque) adminOuverts.delete(cle); else adminOuverts.add(cle);
+
+        if (fleche) fleche.textContent = masque ? '▾' : '▴';
+    };
+
+    bloc.appendChild(entete);
+    bloc.appendChild(corps);
+
+    return bloc;
+}
+
+function ligneTacheAdmin(r) {
+
+    const fait = estFait(r);
+    const tags = [];
+
+    if (valeurRenseignee(r.hauteur) || valeurRenseignee(r.desaxement)) {
+        tags.push(`📏 H ${r.hauteur ?? '?'} ${UNITE_HAUTEUR} · D ${r.desaxement ?? '?'} ${UNITE_DESAXEMENT}`);
+    }
+
+    if (tacheExigeQt(r)) {
+        tags.push(`🔢 ${valeurRenseignee(r.qt_realisee) ? r.qt_realisee : '?'} / ${qtMax(r)}`);
+    }
+
+    if (tacheExigeBRH(r) && r.brh !== null && r.brh !== undefined) {
+        tags.push(`🔨 BRH ${r.brh ? 'Oui' : 'Non'}`);
+    }
+
+    const obs = String(r.Observation || '').trim();
+    const qui = [r.prenom, r.nom].filter(Boolean).join(' ');
+
+    return `
+        <div class="flex items-start gap-2 p-2 rounded-lg border text-xs ${fait ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'}">
+            <span class="mt-0.5">${fait ? '✅' : '⬜'}</span>
+            <div class="flex-1 min-w-0">
+                <div class="font-semibold text-gray-800">${escHtml(r.Tache)}</div>
+                ${tags.length ? `<div class="flex flex-wrap gap-1 mt-1">${tags.map(t => `<span class="px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 font-semibold">${escHtml(t)}</span>`).join('')}</div>` : ''}
+                ${obs ? `<div class="mt-1 text-gray-600 italic">📝 ${escHtml(obs)}</div>` : ''}
+                ${fait && qui ? `<div class="mt-1 text-[11px] text-gray-400">par ${escHtml(qui)}</div>` : ''}
+            </div>
+        </div>`;
+}
+
 function construireVueAdminHierarchique() {
 
-    const conteneur =
-        document.getElementById(
-            'conteneurAdminHierarchique'
-        );
+    const conteneur = document.getElementById('conteneurAdminHierarchique');
+    conteneur.innerHTML = '';
 
-    conteneur.innerHTML =
-        '';
+    const types = trierTypes([...new Set(rawData.map(cleChapitre))]);
 
-    const chantiers =
-        [
-            ...new Set(
-                rawData
-                    .map(
-                        r =>
-                            r.Chantier
-                    )
-                    .filter(Boolean)
-            )
-        ];
+    if (adminFiltreType !== 'all' && !types.includes(adminFiltreType)) {
+        adminFiltreType = 'all';
+    }
 
-    chantiers.forEach(
-        chantier => {
+    const base = rawData.filter(
+        r => adminFiltreType === 'all' || cleChapitre(r) === adminFiltreType
+    );
 
-            const lignes =
-                rawData.filter(
-                    r =>
-                        r.Chantier ===
-                        chantier
-                );
+    const chantiers = [...new Set(base.map(r => r.Chantier).filter(Boolean))];
 
-            const faites =
-                lignes.filter(
-                    r =>
-                        [
-                            'vrai',
-                            'true',
-                            '1'
-                        ].includes(
-                            String(r.Fait)
-                                .toLowerCase()
-                                .trim()
-                        )
-                ).length;
+    /* ---------- Bandeau global ---------- */
 
-            const total =
-                lignes.length;
+    const g = statsLignes(base);
 
-            const pct =
-                total
-                    ? Math.round(
-                        faites /
-                        total *
-                        100
-                    )
-                    : 0;
+    const kpi = document.createElement('div');
+    kpi.className = 'rounded-2xl p-4 text-white shadow-md';
+    kpi.style.background = 'linear-gradient(135deg,#0b2545,#1d4ed8)';
+    kpi.innerHTML = `
+        <div class="flex items-end justify-between gap-3">
+            <div>
+                <div class="text-xs uppercase tracking-wide opacity-80">Avancement ${adminFiltreType === 'all' ? 'global' : escHtml(libelleType(adminFiltreType))}</div>
+                <div class="text-4xl font-extrabold leading-tight">${g.p}%</div>
+            </div>
+            <div class="text-right text-sm opacity-90">
+                ${g.f} / ${g.t} tâches<br>${chantiers.length} chantier(s)
+            </div>
+        </div>
+        <div class="w-full bg-white/25 rounded-full h-2.5 mt-3 overflow-hidden">
+            <div class="h-2.5 rounded-full bg-white" style="width:${g.p}%"></div>
+        </div>`;
+    conteneur.appendChild(kpi);
 
-            const card =
-                document.createElement(
-                    'div'
-                );
+    /* ---------- Sous-menu par type ---------- */
 
-            card.className =
-                'border rounded-xl overflow-hidden bg-white shadow-sm';
+    const chips = document.createElement('div');
+    chips.className = 'flex flex-wrap gap-2';
 
-            card.innerHTML =
-                `<div class="p-4 bg-gray-50 cursor-pointer flex justify-between">
-                    <div>
-                        <b>🏗️ ${chantier}</b>
-                        <div class="text-xs text-gray-500">
-                            ${faites}/${total} tâches (${pct}%)
-                        </div>
+    ['all', ...types].forEach(cle => {
+
+        const s = statsLignes(rawData.filter(r => cle === 'all' || cleChapitre(r) === cle));
+
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = `px-3 py-1.5 rounded-full text-xs font-bold border transition ${
+            adminFiltreType === cle
+                ? 'bg-blue-600 text-white border-blue-600 shadow'
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'
+        }`;
+        b.textContent = `${libelleType(cle)} · ${s.p}%`;
+        b.onclick = () => {
+            adminFiltreType = cle;
+            construireVueAdminHierarchique();
+        };
+
+        chips.appendChild(b);
+    });
+
+    conteneur.appendChild(chips);
+
+    if (!chantiers.length) {
+
+        const vide = document.createElement('p');
+        vide.className = 'text-sm text-gray-500 text-center py-6';
+        vide.textContent = 'Aucune donnée pour ce filtre.';
+        conteneur.appendChild(vide);
+
+        return;
+    }
+
+    /* ---------- Chantiers ---------- */
+
+    chantiers.forEach(chantier => {
+
+        const lignes = base.filter(r => r.Chantier === chantier);
+        const s = statsLignes(lignes);
+
+        const typesChantier = trierTypes([...new Set(lignes.map(cleChapitre))]);
+
+        const miniBarres = typesChantier.map(c => {
+
+            const st = statsLignes(lignes.filter(r => cleChapitre(r) === c));
+
+            return `
+                <div>
+                    <div class="flex justify-between text-[11px] text-gray-600 mb-0.5">
+                        <span>${escHtml(libelleType(c))}</span>
+                        <span class="font-bold">${st.f}/${st.t}</span>
                     </div>
-                    <span>📁 ▾</span>
+                    ${barreHtml(st.p, 'h-1.5')}
+                </div>`;
+        }).join('');
+
+        /* Supports du chantier */
+
+        const corpsChantier = document.createElement('div');
+        corpsChantier.className = 'p-3 space-y-2 bg-gray-50 border-t';
+
+        const supports = [...new Set(lignes.map(r => r.Support).filter(Boolean))]
+            .sort((a, b) =>
+                String(a).localeCompare(String(b), 'fr', { numeric: true, sensitivity: 'base' })
+            );
+
+        supports.forEach(support => {
+
+            const lignesSupport = lignes.filter(r => r.Support === support);
+            const ss = statsLignes(lignesSupport);
+
+            const corpsSupport = document.createElement('div');
+            corpsSupport.className = 'p-3 space-y-2 border-t bg-white';
+
+            trierTypes([...new Set(lignesSupport.map(cleChapitre))]).forEach(c => {
+
+                const lt = lignesSupport.filter(r => cleChapitre(r) === c);
+                const st = statsLignes(lt);
+
+                corpsSupport.insertAdjacentHTML('beforeend', `
+                    <div class="flex items-center justify-between pt-1">
+                        <span class="text-[11px] font-bold uppercase text-gray-500">${escHtml(libelleType(c))}</span>
+                        <span class="text-[11px] font-bold px-2 py-0.5 rounded-full text-white" style="background:${couleurPct(st.p)}">${st.f}/${st.t}</span>
+                    </div>
+                    ${lt.map(ligneTacheAdmin).join('')}`);
+            });
+
+            const enteteSupport = `
+                <div class="p-3">
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-sm font-semibold text-gray-800">📍 ${escHtml(support)}</span>
+                        <span class="flex items-center gap-2">
+                            <span class="text-xs font-bold px-2 py-0.5 rounded-full text-white" style="background:${couleurPct(ss.p)}">${ss.f}/${ss.t} · ${ss.p}%</span>
+                            <span class="fleche text-gray-500"></span>
+                        </span>
+                    </div>
+                    <div class="mt-2">${barreHtml(ss.p, 'h-1.5')}</div>
                 </div>`;
 
-            const details =
-                document.createElement(
-                    'div'
-                );
-
-            details.className =
-                'hidden p-3 space-y-2';
-
-            const supports =
-                [
-                    ...new Set(
-                        lignes
-                            .map(
-                                r =>
-                                    r.Support
-                            )
-                            .filter(Boolean)
-                    )
-                ];
-
-            supports.forEach(
-                support => {
-
-                    const lignesSupport =
-                        lignes.filter(
-                            r =>
-                                r.Support ===
-                                support
-                        );
-
-                    const bloc =
-                        document.createElement(
-                            'div'
-                        );
-
-                    bloc.className =
-                        'border rounded-lg overflow-hidden';
-
-                    const entete =
-                        document.createElement(
-                            'div'
-                        );
-
-                    entete.className =
-                        'p-3 bg-gray-50 font-semibold cursor-pointer';
-
-                    entete.innerText =
-                        `📍 ${support}`;
-
-                    const travaux =
-                        document.createElement(
-                            'div'
-                        );
-
-                    travaux.className =
-                        'hidden p-2 space-y-2';
-
-                    lignesSupport.forEach(
-                        item => {
-
-                            const fait =
-                                [
-                                    'vrai',
-                                    'true',
-                                    '1'
-                                ].includes(
-                                    String(item.Fait)
-                                        .toLowerCase()
-                                        .trim()
-                                );
-
-                            const ligne =
-                                document.createElement(
-                                    'div'
-                                );
-
-                            ligne.className =
-                                'p-2 border rounded text-xs';
-
-                            ligne.innerText =
-                                `${fait ? '✅' : '❌'} ${item.Tache}
-                                ${item.hauteur != null ? ` | H: ${item.hauteur} m` : ''}
-                                ${item.desaxement != null ? ` | D: ${item.desaxement} cm` : ''}`;
-
-                            travaux.appendChild(
-                                ligne
-                            );
-                        }
-                    );
-
-                    entete.onclick =
-                        () => {
-
-                            travaux.classList.toggle(
-                                'hidden'
-                            );
-                        };
-
-                    bloc.appendChild(
-                        entete
-                    );
-
-                    bloc.appendChild(
-                        travaux
-                    );
-
-                    details.appendChild(
-                        bloc
-                    );
-                }
+            corpsChantier.appendChild(
+                blocRepliable(
+                    `s|${chantier}|${support}`,
+                    enteteSupport,
+                    corpsSupport,
+                    'border rounded-xl overflow-hidden bg-white shadow-sm'
+                )
             );
+        });
 
-            const enteteChantier =
-                card.firstElementChild;
+        const enteteChantier = `
+            <div class="p-4">
+                <div class="flex items-center justify-between gap-2">
+                    <div class="font-bold text-gray-800">🏗️ ${escHtml(chantier)}</div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold px-2.5 py-1 rounded-full text-white" style="background:${couleurPct(s.p)}">${s.p}%</span>
+                        <span class="fleche text-gray-500"></span>
+                    </div>
+                </div>
+                <div class="text-xs text-gray-500 mt-1 mb-2">${s.f} / ${s.t} tâches validées</div>
+                ${barreHtml(s.p, 'h-2.5')}
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">${miniBarres}</div>
+            </div>`;
 
-            enteteChantier.onclick =
-                () => {
-
-                    details.classList.toggle(
-                        'hidden'
-                    );
-                };
-
-            card.appendChild(
-                details
-            );
-
-            conteneur.appendChild(
-                card
-            );
-        }
-    );
+        conteneur.appendChild(
+            blocRepliable(
+                `c|${chantier}`,
+                enteteChantier,
+                corpsChantier,
+                'border rounded-2xl overflow-hidden bg-white shadow-md'
+            )
+        );
+    });
 }
 
 
