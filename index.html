@@ -946,6 +946,11 @@ logDiag("Table utilisée : " + TABLE_SUPABASE);/*bob*/
 
 const UNITE_HAUTEUR = "m";
 const UNITE_DESAXEMENT = "cm";
+    function dateDuPoste() {
+    const d = new Date();
+    if (d.getHours() < 6) d.setDate(d.getDate() - 1);
+    return d.toLocaleDateString('sv-SE'); // AAAA-MM-JJ
+}
 
 /*
  * IMPORTANT :
@@ -3199,7 +3204,20 @@ async function validerChoix(i) {
 
     } else {
 
-        await modifierLigneMulti(id, { qt_realisee: val, Fait: val >= qtMax(item) });
+        const hist = Array.isArray(item.qt_historique) ? [...item.qt_historique] : [];
+
+        hist.push({
+            qt: val,
+            date: dateDuPoste(),
+            nom: userName,
+            prenom: userPrenom
+        });
+
+        await modifierLigneMulti(id, {
+            qt_realisee: val,
+            Fait: val >= qtMax(item),
+            qt_historique: hist
+        });
     }
 }
 
@@ -3570,6 +3588,12 @@ async function modifierLigne(
         prenom:userPrenom
     };
 
+    if (champ === 'Fait') {
+        updateData.date_fait = valeur ? dateDuPoste() : null;
+    }
+    if ('Fait' in champs) {
+        updateData.date_fait = champs.Fait ? dateDuPoste() : null;
+    }
     /*
      * Mise à jour locale.
      */
@@ -4728,7 +4752,9 @@ function ligneTacheAdmin(r) {
     if (tacheExigeQt(r)) {
         tags.push(`🔢 ${valeurRenseignee(r.qt_realisee) ? r.qt_realisee : '?'} / ${qtMax(r)}`);
     }
-
+    if (r.date_fait) {
+        tags.push(`📅 ${r.date_fait.split('-').reverse().join('/')}`);
+    }
     if (tacheExigeBRH(r) && r.brh !== null && r.brh !== undefined) {
         tags.push(`🔨 BRH ${r.brh ? 'Oui' : 'Non'}`);
     }
@@ -5100,7 +5126,7 @@ function horodatage() {
 
 function cellCsv(v) {
     if (v === null || v === undefined) return '';
-    const s = String(v);
+    const s = (typeof v === 'object') ? JSON.stringify(v) : String(v);
     return (/[",\r\n]/.test(s) || s.includes(CSV_SEPARATEUR))
         ? `"${s.replace(/"/g, '""')}"`
         : s;
@@ -5379,7 +5405,7 @@ async function genererEtPartagerPDF() {
 
     doc.autoTable({
         startY: 56,
-        head: [['Chantier', 'Support', 'Type', 'Tâche', 'Fait', 'H (m)', 'D (cm)', 'Qté', 'BRH', 'Observation']],
+        head: [['Chantier', 'Support', 'Type', 'Tâche', 'Fait', 'Date', 'H (m)', 'D (cm)', 'Qté', 'BRH', 'Observation']],
         body: modifies.map(r => [
             r.Chantier || '',
             r.Support || '',
@@ -5388,7 +5414,12 @@ async function genererEtPartagerPDF() {
             estFait(r) ? 'Oui' : 'Non',
             r.hauteur ?? '',
             r.desaxement ?? '',
-            tacheExigeQt(r) ? `${r.qt_realisee ?? '?'}/${qtMax(r)}` : '',
+                        tacheExigeQt(r)
+                ? `${r.qt_realisee ?? '?'}/${qtMax(r)}` +
+                  ((r.qt_historique || []).length
+                      ? '\n' + r.qt_historique.map(h => `${h.qt} le ${h.date.slice(8)}/${h.date.slice(5, 7)}`).join('\n')
+                      : '')
+                : '',
             tacheExigeBRH(r) && r.brh !== null && r.brh !== undefined ? (r.brh ? 'Oui' : 'Non') : '',
             r.Observation || ''
         ]),
