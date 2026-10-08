@@ -916,7 +916,7 @@ const supabaseClient =
     );
 
 
-logDiag("Table utilisée : " + (typeof TABLE_SUPABASE !== 'undefined' ? TABLE_SUPABASE : 'NON DÉFINIE'));/*bob*/
+
 
 
     
@@ -941,6 +941,8 @@ let qrStream = null;
 let qrScanInterval = null;
 
 let logsDiagnosticGlobal = [];
+
+logDiag("Table utilisée : " + TABLE_SUPABASE);/*bob*/
 
 const UNITE_HAUTEUR = "m";
 const UNITE_DESAXEMENT = "cm";
