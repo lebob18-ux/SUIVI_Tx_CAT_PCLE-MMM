@@ -4242,11 +4242,7 @@ function ouvrirModalAjoutTache() {
     typesDisponibles().forEach(t => selType.add(new Option(t, t)));
 
     /* Tâches du chantier absentes de ce support */
-    const deja = new Set(
-        rawData
-            .filter(r => r.Chantier === chantier && r.Support === support)
-            .map(r => cleChapitre(r) + '|' + normaliserTexte(r.Tache).trim())
-    );
+
 
     const vus = new Set();
     tachesExistantesModal = [];
@@ -4258,7 +4254,7 @@ function ouvrirModalAjoutTache() {
 
                 const cle = cleChapitre(r) + '|' + normaliserTexte(r.Tache).trim();
 
-                if (deja.has(cle) || vus.has(cle)) return;
+                if (vus.has(cle)) return;
 
                 vus.add(cle);
 
@@ -4335,20 +4331,6 @@ async function validerAjoutTacheManuelle() {
         return;
     }
 
-    const existeDeja = rawData.some(
-        r =>
-            r.Chantier === selectChantier.value &&
-            r.Support === selectSupport.value &&
-            cleChapitre(r) === normaliserTexte(typeChoisi).trim() &&
-            normaliserTexte(r.Tache).trim() === normaliserTexte(intitule).trim()
-    );
-
-    if (existeDeja) {
-
-        alert("Cette tâche existe déjà dans ce support et ce chapitre.");
-
-        return;
-    }
 
     const nouvelleLigne = {
         Chantier: selectChantier.value,
