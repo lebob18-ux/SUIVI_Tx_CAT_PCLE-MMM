@@ -895,8 +895,9 @@
    CONFIGURATION
 ============================================================ */
 
-const APP_NAME = "suivi_sutx_ipse";
+const APP_NAME = "TABLE_SUPABASE";
 const CACHE_KEY = `cache_${APP_NAME}`;
+const TABLE_SUPABASE = "suivi_sutx_v2";
 const FILE_ATTENTE_KEY = "file_attente_sutx";
 
 const SUPABASE_URL =
@@ -1181,7 +1182,7 @@ async function chargerToutesLesLignes() {
 
         const { data, error } =
             await supabaseClient
-                .from('suivi_sutx_ipse')
+                .from('TABLE_SUPABASE')
                 .select('*')
                 .order('id', { ascending: true })
                 .range(debut, debut + taille - 1);
@@ -3487,7 +3488,7 @@ async function envoyerModificationSupabase(
         error
     } =
         await supabaseClient
-            .from('suivi_sutx_ipse')
+            .from('TABLE_SUPABASE')
             .update(updateData)
             .eq(
                 'id',
@@ -3941,7 +3942,23 @@ async function verifierEtSynchroniserFileAttente() {
         const action
         of fileAttente
     ) {
+        if (action && action.type === 'insert') {
 
+            try {
+
+                await synchroniserInsertion(action);
+
+            } catch (err) {
+
+                logDiag(
+                    `❌ Insertion impossible en synchro : ${err.message || err}`
+                );
+
+                reste.push(action);
+            }
+
+            continue;
+        }
         /*
          * Ancienne structure éventuelle :
          * on ne la traite pas aveuglément.
@@ -4351,7 +4368,7 @@ async function validerAjoutTacheManuelle() {
 
             const { data, error } =
                 await supabaseClient
-                    .from('suivi_sutx_ipse')
+                    .from('TABLE_SUPABASE')
                     .insert([{
                         Chantier: nouvelleLigne.Chantier,
                         Support: nouvelleLigne.Support,
@@ -4420,7 +4437,7 @@ async function synchroniserInsertion(
         error
     } =
         await supabaseClient
-            .from('suivi_sutx_ipse')
+            .from('TABLE_SUPABASE')
             .insert([
                 action.data
             ])
