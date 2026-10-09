@@ -2390,14 +2390,11 @@ function lancerApplication() {
         'hidden',
         !userAdmin
     );
-    chargerDonneesSupabase()
-        .then(
-            () => {
-
-                verifierParametresURLAuDemarrage();
-
-            }
-        );
+    verifierEtSynchroniserFileAttente()
+        .then(() => chargerDonneesSupabase())
+        .then(() => {
+            verifierParametresURLAuDemarrage();
+        });
 }
 
 
@@ -3204,14 +3201,28 @@ async function validerChoix(i) {
 
     } else {
 
-        const hist = Array.isArray(item.qt_historique) ? [...item.qt_historique] : [];
+        let base = Array.isArray(item.qt_historique) ? item.qt_historique : [];
 
-        hist.push({
+        if (estEnLigne) {
+            try {
+                const { data } = await supabaseClient
+                    .from(TABLE_SUPABASE)
+                    .select('qt_historique')
+                    .eq('id', id)
+                    .single();
+
+                if (data && Array.isArray(data.qt_historique)) {
+                    base = data.qt_historique;
+                }
+            } catch (e) {}
+        }
+
+        const hist = [...base, {
             qt: val,
             date: dateDuPoste(),
             nom: userName,
             prenom: userPrenom
-        });
+        }];
 
         await modifierLigneMulti(id, {
             qt_realisee: val,
@@ -3219,7 +3230,6 @@ async function validerChoix(i) {
             qt_historique: hist
         });
     }
-}
 
 function cocherTache(id, checkbox) {
 
@@ -5615,7 +5625,14 @@ window.addEventListener(
         }
     }
 );
+document.addEventListener('visibilitychange', async () => {
 
+    if (document.visibilityState !== 'visible' || !estEnLigne || !userEmail) return;
+
+    await verifierEtSynchroniserFileAttente();
+    await chargerDonneesSupabase();
+    rafraichirAffichageTaches();
+});
 </script>
 
 </body>
