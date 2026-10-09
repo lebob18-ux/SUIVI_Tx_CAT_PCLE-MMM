@@ -891,7 +891,13 @@
         </div>
 
     </div>
-
+    
+    <div id="divZoomImg"
+         class="app-modal fixed inset-0 bg-black bg-opacity-90 items-center justify-center z-[2000] p-2"
+         onclick="fermerZoomImage()">
+        <img id="imgZoomCible" alt="Zoom" class="max-w-full max-h-full object-contain">
+    </div>
+    
 <script>
 console.log("VERSION v2 chargée");/*bob*/
 /* ============================================================
@@ -951,7 +957,25 @@ const UNITE_DESAXEMENT = "cm";
     if (d.getHours() < 6) d.setDate(d.getDate() - 1);
     return d.toLocaleDateString('sv-SE'); // AAAA-MM-JJ
 }
+const dernierPct = {};
 
+function afficherToast(message) {
+
+    let t = document.getElementById('toastSutx');
+
+    if (!t) {
+        t = document.createElement('div');
+        t.id = 'toastSutx';
+        t.style.cssText = 'position:fixed;left:50%;bottom:70px;transform:translateX(-50%);z-index:4000;background:#111827;color:#fff;padding:10px 18px;border-radius:999px;font-size:13px;font-weight:bold;box-shadow:0 4px 14px rgba(0,0,0,.35);transition:opacity .3s;opacity:0;pointer-events:none;';
+        document.body.appendChild(t);
+    }
+
+    t.textContent = message;
+    t.style.opacity = '1';
+
+    clearTimeout(t._h);
+    t._h = setTimeout(() => { t.style.opacity = '0'; }, 2200);
+}
 /*
  * IMPORTANT :
  * on mémorise maintenant l'ID Supabase,
@@ -1211,22 +1235,41 @@ async function chargerToutesLesLignes() {
 
     return tout;
 }
+let derniereSync = 0;
+
 async function chargerDonneesSupabase() {
 
-    logDiag(
-        "Début du chargement des données..."
+    logDiag("Début du chargement des données...");
+
+    const modifiesAvant = new Set(
+        rawData.filter(r => r.modifie === true).map(r => String(r.id))
     );
+
+    const customAvant = new Set(
+        rawData.filter(r => r.isCustom === true).map(r => String(r.id))
+    );
+
+    const localesNonSynchro = rawData.filter(r => r._insertionLocale === true);
 
     try {
 
         if (estEnLigne) {
 
-            rawData =
-                await chargerToutesLesLignes();
+            rawData = await chargerToutesLesLignes();
+
+            derniereSync = Date.now();
 
             logDiag(
-                `Données Supabase reçues : ${rawData.length} lignes.`
+                `Données Supabase reçues : ${rawData.length} lignes, ${Math.round(JSON.stringify(rawData).length / 1024)} Ko.`
             );
+
+            rawData.forEach(r => {
+                const k = String(r.id);
+                if (modifiesAvant.has(k)) r.modifie = true;
+                if (customAvant.has(k)) r.isCustom = true;
+            });
+
+            rawData.push(...localesNonSynchro);
 
             sauvegarderCacheLocal();
 
@@ -1237,17 +1280,14 @@ async function chargerDonneesSupabase() {
 
     } catch (err) {
 
-        logDiag(
-            `⚠️ Erreur Supabase : ${err.message || err}`
-        );
+        logDiag(`⚠️ Erreur Supabase : ${err.message || err}`);
 
         chargerDonneesLocalesCache();
     }
 
     initialiserSelecteursChantiers();
+    rafraichirAffichageTaches();
 }
-
-
 function chargerDonneesLocalesCache() {
 
     const cache =
@@ -2843,7 +2883,15 @@ function rafraichirAffichageTaches() {
     document.getElementById(
         'badgeProgressionSupport'
     ).innerText =
-        `${faites} / ${total} (${pct}%)`;
+    `${faites} / ${total} (${pct}%)`;
+        const cleSupport = `${chantier}||${support}`;
+
+    if (pct === 100 && total > 0 && dernierPct[cleSupport] !== undefined && dernierPct[cleSupport] !== 100) {
+        afficherToast('🎉 Support terminé !');
+        if (navigator.vibrate) navigator.vibrate([80, 40, 80]);
+    }
+
+    dernierPct[cleSupport] = pct;
     chapitresCourants = {};
 
     chapitresForcerOuvert =
@@ -3230,6 +3278,7 @@ async function validerChoix(i) {
             qt_historique: hist
         });
     }
+}
 
 function cocherTache(id, checkbox) {
 
@@ -3601,12 +3650,7 @@ async function modifierLigne(
     if (champ === 'Fait') {
         updateData.date_fait = valeur ? dateDuPoste() : null;
     }
-    if ('Fait' in champs) {
-        updateData.date_fait = champs.Fait ? dateDuPoste() : null;
-    }
-    /*
-     * Mise à jour locale.
-     */
+
 
     Object.assign(
         rawData[index],
@@ -3724,10 +3768,10 @@ async function modifierLigneMulti(
 
         prenom:userPrenom
     };
-
-    /*
-     * Mise à jour locale immédiate.
-     */
+    if ('Fait' in champs) {
+        updateData.date_fait = champs.Fait ? dateDuPoste() : null;
+    }
+    /*     * Mise à jour locale immédiate.     */
 
     Object.assign(
         rawData[index],
@@ -3827,9 +3871,9 @@ function sauvegarderCacheLocal() {
 
     } catch (e) {
 
-            logDiag(
-                `Données Supabase reçues : ${rawData.length} lignes, ${Math.round(JSON.stringify(rawData).length / 1024)} Ko.`
-            );
+        logDiag(
+            `⚠️ Cache local impossible (${rawData.length} lignes) : ${e.message || e}`
+        );
     }
 }
 
@@ -3916,9 +3960,11 @@ function enregistrerModificationFileAttente(
     localStorage.setItem(
         FILE_ATTENTE_KEY,
         JSON.stringify(
-            fileAttente
+            reste
         )
     );
+
+    if (rawData.length) sauvegarderCacheLocal();
 
     logDiag(
         `📦 Modification hors ligne enregistrée pour ID ${id}`
@@ -4214,6 +4260,7 @@ function enregistrerInsertionFileAttente(
 
             Fait:
                 ligne.Fait,
+            date_fait: ligne.date_fait,
 
             Observation:
                 ligne.Observation,
@@ -4382,6 +4429,7 @@ async function validerAjoutTacheManuelle() {
         Tache: intitule,
         type: typeChoisi,
         Fait: true,
+        date_fait: dateDuPoste(),
         Observation: "Travail non prévu ajouté manuellement",
         nom: userName,
         prenom: userPrenom,
@@ -4402,6 +4450,7 @@ async function validerAjoutTacheManuelle() {
                         Tache: nouvelleLigne.Tache,
                         type: nouvelleLigne.type,
                         Fait: nouvelleLigne.Fait,
+                        date_fait: nouvelleLigne.date_fait,
                         Observation: nouvelleLigne.Observation,
                         nom: nouvelleLigne.nom,
                         prenom: nouvelleLigne.prenom
@@ -4573,7 +4622,7 @@ async function cocherToutSupport(
         const updateData = {
 
             Fait:etat,
-
+            date_fait: etat ? dateDuPoste() : null,
             nom:userName,
 
             prenom:userPrenom
@@ -4581,7 +4630,7 @@ async function cocherToutSupport(
 
         item.Fait =
             etat;
-
+          item.date_fait = etat ? dateDuPoste() : null;
         item.nom =
             userName;
 
@@ -5108,7 +5157,7 @@ const CSV_BOM = false;
 
 const CSV_ORDRE = [
     'id', 'Chantier', 'Support', 'Tache', 'type', 'qt_prevu', 'qt_realisee',
-    'Fait', 'Observation', 'hauteur', 'desaxement', 'brh', 'info', 'img', 'nom', 'prenom'
+    'Fait', 'Observation', 'hauteur', 'desaxement', 'brh','date_fait', 'qt_historique', 'info', 'img', 'nom', 'prenom'
 ];
 
 const CSV_EXCLUS = ['modifie', 'isCustom', '_insertionLocale'];
@@ -5405,6 +5454,7 @@ async function genererEtPartagerPDF() {
             libellePdf(cleChapitre(r)),
             r.Tache || '',
             estFait(r) ? 'Oui' : 'Non',
+            r.date_fait ? r.date_fait.split('-').reverse().join('/') : '',
             r.hauteur ?? '',
             r.desaxement ?? '',
                         tacheExigeQt(r)
@@ -5453,7 +5503,7 @@ function verifierParametresURLAuDemarrage() {
         new URLSearchParams(
             window.location.search
         );
-
+    if (!etat && !confirm("Décocher toutes les tâches de ce support ?")) return;
     const chantier =
         params.get(
             'chantier'
@@ -5612,10 +5662,13 @@ document.addEventListener('visibilitychange', async () => {
 
     if (document.visibilityState !== 'visible' || !estEnLigne || !userEmail) return;
 
+    if (document.getElementById('main-app').classList.contains('hidden')) return;
+
+    if (Date.now() - derniereSync < 60000) return;
+
     await verifierEtSynchroniserFileAttente();
     await chargerDonneesSupabase();
-    rafraichirAffichageTaches();
-});
+});;
 </script>
 
 </body>
