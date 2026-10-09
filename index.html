@@ -3818,37 +3818,20 @@ async function modifierLigneMulti(
 
 function sauvegarderCacheLocal() {
 
-    localStorage.setItem(
-        CACHE_KEY,
-        JSON.stringify(
-            rawData
-        )
-    );
+    try {
+
+        localStorage.setItem(
+            CACHE_KEY,
+            JSON.stringify(rawData)
+        );
+
+    } catch (e) {
+
+            logDiag(
+                `Données Supabase reçues : ${rawData.length} lignes, ${Math.round(JSON.stringify(rawData).length / 1024)} Ko.`
+            );
+    }
 }
-
-
-/* ============================================================
-   FILE D'ATTENTE HORS-LIGNE
-============================================================ */
-
-/*
- * Nouvelle structure :
- *
- * [
- *   {
- *      type:"update",
- *      timestamp:...,
- *      id:"...",
- *      data:{
- *          Fait:true,
- *          hauteur:5.3,
- *          desaxement:-12
- *      }
- *   }
- * ]
- *
- * Une seule entrée par ID.
- */
 
 function enregistrerModificationFileAttente(
     id,
