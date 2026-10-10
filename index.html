@@ -311,7 +311,10 @@
                        style="width:100%;padding:8px;box-sizing:border-box;border-radius:4px;border:1px solid #444;background:#222;color:#fff;font-size:13px;">
 
             </div>
-
+            <label style="display:flex;align-items:center;gap:8px;color:#9ca3af;font-size:13px;margin-bottom:12px;">
+                <input type="checkbox" id="masquerTermines" checked onchange="filtrerListeSupportsDroite()">
+                Masquer les supports terminés
+            </label>
             <div id="sidebarSupportsContainer"
                  style="display:flex;flex-direction:column;gap:6px;">
             </div>
@@ -529,7 +532,23 @@
                     </button>
 
                 </div>
+                <div id="ongletsTaches" class="flex gap-2">
 
+                    <button type="button"
+                            id="btnOngletAFaire"
+                            onclick="changerOngletTaches('afaire')"
+                            class="flex-1 py-2 rounded-lg text-sm font-bold bg-blue-600 text-white">
+                        ⏳ À faire (0)
+                    </button>
+
+                    <button type="button"
+                            id="btnOngletFaits"
+                            onclick="changerOngletTaches('faits')"
+                            class="flex-1 py-2 rounded-lg text-sm font-bold bg-gray-200 text-gray-700">
+                        ✅ Faits (0)
+                    </button>
+
+                </div>
                 <div id="containerTaches"
                      class="space-y-3">
                 </div>
@@ -956,6 +975,45 @@ const UNITE_DESAXEMENT = "cm";
     const d = new Date();
     if (d.getHours() < 6) d.setDate(d.getDate() - 1);
     return d.toLocaleDateString('sv-SE'); // AAAA-MM-JJ
+}
+let ongletTaches = 'afaire';
+const VERROU_FBM = true;
+
+function tacheVerrouilleeFBM(item) {
+    if (!VERROU_FBM) return false;
+    if (cleChapitre(item) !== 'gc') return false;
+    const t = normaliserTexte(item.Tache);
+    return t.includes('fouille') || t.includes('beton') || t.includes('matage');
+}
+
+function changerOngletTaches(nom) {
+    ongletTaches = nom;
+    rafraichirAffichageTaches();
+}
+
+function majOngletsTaches(faites, total) {
+
+    const actif = 'bg-blue-600 text-white';
+    const inactif = 'bg-gray-200 text-gray-700';
+
+    const bA = document.getElementById('btnOngletAFaire');
+    const bF = document.getElementById('btnOngletFaits');
+
+    if (bA) {
+        bA.className = `flex-1 py-2 rounded-lg text-sm font-bold ${ongletTaches === 'afaire' ? actif : inactif}`;
+        bA.textContent = `⏳ À faire (${total - faites})`;
+    }
+
+    if (bF) {
+        bF.className = `flex-1 py-2 rounded-lg text-sm font-bold ${ongletTaches === 'faits' ? actif : inactif}`;
+        bF.textContent = `✅ Faits (${faites})`;
+    }
+
+    const btnCocher = document.querySelector('#sectionActionsRapides button[onclick="cocherToutSupport(true)"]');
+    const btnDecocher = document.querySelector('#sectionActionsRapides button[onclick="cocherToutSupport(false)"]');
+
+    if (btnCocher) btnCocher.classList.toggle('hidden', ongletTaches !== 'afaire');
+    if (btnDecocher) btnDecocher.classList.toggle('hidden', ongletTaches !== 'faits');
 }
 const dernierPct = {};
 
@@ -2054,7 +2112,7 @@ supports.sort((a, b) =>
         }
     )
 );
-
+const masquerTermines = document.getElementById('masquerTermines')?.checked;
 supports.forEach(
     support => {
 
@@ -2080,7 +2138,7 @@ supports.forEach(
                                 .trim()
                         )
                 ).length;
-
+            if (masquerTermines && lignes.length && faites === lignes.length) return;
             const bouton =
                 document.createElement(
                     'button'
@@ -2616,6 +2674,8 @@ selectSupport.addEventListener(
     'change',
     () => {
 
+        ongletTaches = 'afaire';
+
         document.getElementById(
             'filtreTachesInput'
         ).value = '';
@@ -2841,18 +2901,10 @@ function rafraichirAffichageTaches() {
                 support
         );
 
-    const visibles =
-        lignes.filter(
-            r =>
-                !filtre ||
-                String(
-                    r.Tache || ''
-                )
-                .toLowerCase()
-                .includes(
-                    filtre
-                )
-        );
+    const visibles = lignes.filter(r =>
+        (ongletTaches === 'faits' ? estFait(r) : !estFait(r)) &&
+        (!filtre || String(r.Tache || '').toLowerCase().includes(filtre))
+    );
 
     const faites =
         lignes.filter(
@@ -2884,6 +2936,7 @@ function rafraichirAffichageTaches() {
         'badgeProgressionSupport'
     ).innerText =
     `${faites} / ${total} (${pct}%)`;
+	    majOngletsTaches(faites, total);
         const cleSupport = `${chantier}||${support}`;
 
     if (pct === 100 && total > 0 && dernierPct[cleSupport] !== undefined && dernierPct[cleSupport] !== 100) {
@@ -2896,7 +2949,7 @@ function rafraichirAffichageTaches() {
 
     chapitresForcerOuvert =
         !!filtre ||
-        new Set(lignes.map(cleChapitre)).size === 1;
+                new Set(visibles.map(cleChapitre)).size === 1;
 
     visibles.sort(
         (a, b) =>
@@ -3012,7 +3065,16 @@ function rafraichirAffichageTaches() {
                     badge
                 );
             }
+            if (tacheVerrouilleeFBM(item)) {
 
+                checkbox.disabled = true;
+
+                const badgeFbm = document.createElement('span');
+                badgeFbm.className = 'text-xs bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-bold ml-2';
+                badgeFbm.innerText = coche ? '✔ via FBM' : '🔒 FBM';
+
+                titre.appendChild(badgeFbm);
+            }
 
             /* BOUTON INFO */
 
@@ -3133,6 +3195,16 @@ function rafraichirAffichageTaches() {
                 );
             }
 
+            if (ongletTaches === 'faits' && (item.date_fait || item.nom)) {
+
+                const meta = document.createElement('div');
+                meta.className = 'text-[11px] text-gray-500';
+                meta.textContent =
+                    `📅 ${item.date_fait ? item.date_fait.split('-').reverse().join('/') : '—'}` +
+                    ` · par ${[item.prenom, item.nom].filter(Boolean).join(' ') || '—'}`;
+
+                div.appendChild(meta);
+            }
 
             ajouterDansChapitre(
                 item,
@@ -3141,7 +3213,17 @@ function rafraichirAffichageTaches() {
         }
     );
 
+    if (!visibles.length) {
 
+        containerTaches.innerHTML =
+            `<p class="text-sm text-gray-500 text-center py-6">${
+                filtre
+                    ? 'Aucune tâche ne correspond au filtre.'
+                    : ongletTaches === 'faits'
+                        ? 'Aucune tâche effectuée sur ce support.'
+                        : (total ? '🎉 Tout est fait sur ce support !' : 'Aucune tâche sur ce support.')
+            }</p>`;
+    }
     sectionTachesSupport
         .classList.remove(
             'hidden'
@@ -3297,7 +3379,24 @@ function cocherTache(id, checkbox) {
 
         return;
     }
+    if (tacheVerrouilleeFBM(item)) {
 
+        checkbox.checked = estFait(item);
+
+        (typeof afficherToast === 'function' ? afficherToast : alert)('🔒 Cette tâche se coche depuis FBM');
+
+        return;
+    }
+
+    if (!checkbox.checked && estFait(item)) {
+
+        if (!confirm(`Décocher cette tâche ?\n${item.Tache || ''}`)) {
+
+            checkbox.checked = true;
+
+            return;
+        }
+    }
     if (checkbox.checked && tacheExigeMesures(item)) {
         checkbox.checked = false;
         ouvrirModalMesures(id);
@@ -3960,11 +4059,9 @@ function enregistrerModificationFileAttente(
     localStorage.setItem(
         FILE_ATTENTE_KEY,
         JSON.stringify(
-            reste
+            fileAttente
         )
     );
-
-    if (rawData.length) sauvegarderCacheLocal();
 
     logDiag(
         `📦 Modification hors ligne enregistrée pour ID ${id}`
@@ -4105,7 +4202,7 @@ async function verifierEtSynchroniserFileAttente() {
         )
     );
 
-    sauvegarderCacheLocal();
+    if (rawData.length) sauvegarderCacheLocal();
 
     rafraichirAffichageTaches();
 
@@ -4495,7 +4592,7 @@ async function validerAjoutTacheManuelle() {
     chapitresOuverts.add(
         `${selectChantier.value}||${selectSupport.value}||${cleChapitre(nouvelleLigne)}`
     );
-
+    ongletTaches = 'faits';
     rafraichirAffichageTaches();
 }
 
@@ -4577,8 +4674,9 @@ async function synchroniserInsertion(
 
 async function cocherToutSupport(
     etat
+	
 ) {
-
+    if (!etat && !confirm("Décocher toutes les tâches de ce support ?")) return;
     const chantier =
         selectChantier.value;
 
@@ -4603,6 +4701,9 @@ async function cocherToutSupport(
                 support
         )
             continue;
+			        if (tacheVerrouilleeFBM(item)) continue;
+
+        if (estFait(item) === etat) continue;
         if (
             etat &&
             (
@@ -5503,7 +5604,7 @@ function verifierParametresURLAuDemarrage() {
         new URLSearchParams(
             window.location.search
         );
-    if (!etat && !confirm("Décocher toutes les tâches de ce support ?")) return;
+   
     const chantier =
         params.get(
             'chantier'
