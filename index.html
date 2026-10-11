@@ -912,6 +912,73 @@
     </div>
     
     <div id="divZoomImg"
+		    <div id="divEtatModal"
+         class="app-modal fixed inset-0 bg-black bg-opacity-60 items-center justify-center z-[1500] p-4">
+
+        <div class="bg-white p-5 rounded-xl shadow-2xl w-full max-w-sm overflow-y-auto" style="max-height:92vh;">
+
+            <p class="font-bold text-lg mb-1 text-gray-800 text-center">📊 État d'avancement</p>
+            <p id="etatSousTitre" class="text-xs text-gray-500 mb-3 text-center"></p>
+
+            <div class="flex gap-2 mb-3">
+                <button type="button" id="btnEtatEC" onclick="choisirEtat('EN_COURS')"
+                        class="flex-1 py-2 rounded-lg text-sm font-bold bg-gray-200 text-gray-700">🟠 En cours</button>
+                <button type="button" onclick="choisirEtat('TERMINE')"
+                        class="flex-1 py-2 rounded-lg text-sm font-bold bg-gray-200 text-gray-700">✅ Terminé</button>
+                <button type="button" id="btnEtatAN" onclick="choisirEtat('ANNULE')"
+                        class="flex-1 py-2 rounded-lg text-sm font-bold bg-gray-200 text-gray-700">🚫 Annulé</button>
+            </div>
+
+            <div id="etatDetails" class="hidden">
+
+                <div id="etatPctZone" class="mb-3">
+                    <label class="block text-xs font-bold uppercase text-gray-600 mb-1">
+                        Avancement : <span id="etatPctVal">50</span> %
+                    </label>
+                    <input type="range" id="etatPct" min="0" max="100" step="5" value="50"
+                           oninput="document.getElementById('etatPctVal').innerText=this.value"
+                           class="w-full">
+                </div>
+
+                <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Explication *</label>
+                <textarea id="etatExplication" rows="3"
+                          placeholder="Où en est-on, pourquoi..."
+                          class="w-full p-2.5 border rounded-lg mb-3 text-sm"></textarea>
+
+                <label class="block text-xs font-bold uppercase text-gray-600 mb-1">
+                    Ce qui est fait est-il conforme ?
+                </label>
+                <div class="flex gap-2 mb-3">
+                    <button type="button" id="btnConfOui" onclick="choisirConforme(true)"
+                            class="flex-1 py-2 rounded-lg text-sm font-bold bg-green-600 text-white">✅ Oui</button>
+                    <button type="button" id="btnConfNon" onclick="choisirConforme(false)"
+                            class="flex-1 py-2 rounded-lg text-sm font-bold bg-gray-200 text-gray-700">⚠️ Non</button>
+                </div>
+
+                <div id="etatNcZone" class="hidden mb-3">
+                    <label class="block text-xs font-bold uppercase text-gray-600 mb-1">
+                        Description de la non-conformité *
+                    </label>
+                    <textarea id="etatNcDesc" rows="3"
+                              placeholder="Décris précisément la non-conformité..."
+                              class="w-full p-2.5 border border-red-300 rounded-lg text-sm"></textarea>
+                </div>
+
+                <p id="etatErreur" class="text-red-500 text-xs mb-3 hidden"></p>
+
+                <button type="button" onclick="validerEtat()"
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white p-2.5 rounded-lg font-bold text-sm">
+                    💾 Enregistrer
+                </button>
+            </div>
+
+            <button type="button" onclick="fermerEtat()"
+                    class="w-full mt-3 bg-gray-200 hover:bg-gray-300 text-gray-800 p-2.5 rounded-lg font-bold text-sm">
+                ❌ Fermer
+            </button>
+
+        </div>
+    </div>
          class="app-modal fixed inset-0 bg-black bg-opacity-90 items-center justify-center z-[2000] p-2"
          onclick="fermerZoomImage()">
         <img id="imgZoomCible" alt="Zoom" class="max-w-full max-h-full object-contain">
@@ -3120,6 +3187,21 @@ function rafraichirAffichageTaches() {
             ligne.appendChild(
                 boutonInfo
             );
+			
+            const etatEff = etatEffectif(item);
+
+            const boutonEtat = document.createElement('button');
+            boutonEtat.type = 'button';
+            boutonEtat.title = "État d'avancement";
+            boutonEtat.innerText = etatEff === 'EN_COURS' ? '🟠' : etatEff === 'ANNULE' ? '🚫' : '📊';
+            boutonEtat.className = 'w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-lg shrink-0';
+            boutonEtat.addEventListener('click', event => {
+                event.preventDefault();
+                event.stopPropagation();
+                ouvrirEtatTache(rowId);
+            });
+
+            ligne.appendChild(boutonEtat);
             if (tacheExigeQt(item)) {
 
                 const badgeQt = document.createElement('button');
@@ -3171,7 +3253,36 @@ function rafraichirAffichageTaches() {
 
 
             /* VALEURS MESURES */
+            /* ÉTAT / NON-CONFORMITÉ */
 
+            if (etatEff === 'EN_COURS' || etatEff === 'ANNULE' || item.conforme === false) {
+
+                const zoneEtat = document.createElement('div');
+
+                zoneEtat.className = 'text-xs rounded-lg p-2 border ' +
+                    (item.conforme === false
+                        ? 'bg-red-50 border-red-200 text-red-800'
+                        : 'bg-orange-50 border-orange-200 text-orange-800');
+
+                let h = '';
+
+                if (etatEff === 'EN_COURS') {
+                    h += `🟠 En cours${valeurRenseignee(item.pct_avancement) ? ' · ' + item.pct_avancement + ' %' : ''}`;
+                }
+
+                if (etatEff === 'ANNULE') h += '🚫 Annulé';
+
+                if (item.explication && etatEff !== 'TERMINE') {
+                    h += `<div class="mt-0.5">${escHtml(item.explication)}</div>`;
+                }
+
+                if (item.conforme === false) {
+                    h += `<div class="mt-1 font-bold">⚠️ Non-conformité : ${escHtml(item.nc_description)}</div>`;
+                }
+
+                zoneEtat.innerHTML = h;
+                div.appendChild(zoneEtat);
+            }
             if (
                 mesures &&
                 mesuresRemplies(item)
@@ -3549,7 +3660,140 @@ function ouvrirModalMesures(id) {
         150
     );
 }
+/* ============================================================
+   ÉTAT D'AVANCEMENT + NON-CONFORMITÉ
+============================================================ */
 
+let etatIdEnCours = null;
+let etatChoisi = null;
+let etatConforme = true;
+
+function etatEffectif(r) {
+    if (estFait(r)) return 'TERMINE';
+    return (r.etat && r.etat !== 'TERMINE') ? r.etat : null;
+}
+
+function ouvrirEtatTache(id) {
+
+    const item = trouverLigneParId(id);
+    if (!item) return;
+
+    etatIdEnCours = id;
+    etatChoisi = null;
+    etatConforme = item.conforme !== false;
+
+    document.getElementById('etatSousTitre').innerText = `${item.Support || ''} — ${item.Tache || ''}`;
+    document.getElementById('etatPct').value = valeurRenseignee(item.pct_avancement) ? item.pct_avancement : 50;
+    document.getElementById('etatPctVal').innerText = document.getElementById('etatPct').value;
+    document.getElementById('etatExplication').value = item.explication || '';
+    document.getElementById('etatNcDesc').value = item.nc_description || '';
+    document.getElementById('etatErreur').classList.add('hidden');
+    document.getElementById('etatDetails').classList.add('hidden');
+
+    majBoutonsEtat();
+    majBoutonsConforme();
+    ouvrirModal('divEtatModal');
+
+    const e = etatEffectif(item);
+    if (e === 'EN_COURS' || e === 'ANNULE') choisirEtat(e);
+}
+
+function fermerEtat() {
+    fermerModal('divEtatModal');
+    etatIdEnCours = null;
+}
+
+function majBoutonsEtat() {
+    const actif = 'bg-blue-600 text-white';
+    const inactif = 'bg-gray-200 text-gray-700';
+    [['btnEtatEC', 'EN_COURS'], ['btnEtatAN', 'ANNULE']].forEach(([b, e]) => {
+        document.getElementById(b).className =
+            `flex-1 py-2 rounded-lg text-sm font-bold ${etatChoisi === e ? actif : inactif}`;
+    });
+}
+
+function majBoutonsConforme() {
+    document.getElementById('btnConfOui').className =
+        `flex-1 py-2 rounded-lg text-sm font-bold ${etatConforme ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700'}`;
+    document.getElementById('btnConfNon').className =
+        `flex-1 py-2 rounded-lg text-sm font-bold ${!etatConforme ? 'bg-red-600 text-white' : 'bg-gray-200 text-gray-700'}`;
+    document.getElementById('etatNcZone').classList.toggle('hidden', etatConforme);
+}
+
+function choisirConforme(v) {
+    etatConforme = v;
+    majBoutonsConforme();
+}
+
+function choisirEtat(e) {
+
+    if (e === 'TERMINE') {
+        terminerDepuisEtat();
+        return;
+    }
+
+    etatChoisi = e;
+    document.getElementById('etatDetails').classList.remove('hidden');
+    document.getElementById('etatPctZone').classList.toggle('hidden', e !== 'EN_COURS');
+    majBoutonsEtat();
+}
+
+/* Terminé = même parcours qu'une case cochée (verrou FBM, mesures, BRH, quantité) */
+function terminerDepuisEtat() {
+
+    const id = etatIdEnCours;
+    const item = trouverLigneParId(id);
+
+    fermerEtat();
+
+    if (!item || estFait(item)) return;
+
+    if (tacheVerrouilleeFBM(item)) { afficherToast('🔒 Cette tâche se coche depuis FBM'); return; }
+    if (tacheExigeMesures(item)) { ouvrirModalMesures(id); return; }
+    if (tacheExigeBRH(item)) { ouvrirChoix(id, 'brh'); return; }
+    if (tacheExigeQt(item)) { ouvrirChoix(id, 'qt'); return; }
+
+    modifierLigneMulti(id, { Fait: true, etat: 'TERMINE' });
+}
+
+async function validerEtat() {
+
+    const id = etatIdEnCours;
+    if (!id || !etatChoisi) return;
+
+    const expl = document.getElementById('etatExplication').value.trim();
+    const nc = document.getElementById('etatNcDesc').value.trim();
+    const err = document.getElementById('etatErreur');
+
+    if (!expl) {
+        err.innerText = "⚠️ L'explication est obligatoire.";
+        err.classList.remove('hidden');
+        return;
+    }
+
+    if (!etatConforme && !nc) {
+        err.innerText = "⚠️ Décris la non-conformité.";
+        err.classList.remove('hidden');
+        return;
+    }
+
+    const champs = {
+        etat: etatChoisi,
+        pct_avancement: etatChoisi === 'EN_COURS'
+            ? parseInt(document.getElementById('etatPct').value, 10)
+            : null,
+        explication: expl,
+        conforme: etatConforme,
+        nc_description: etatConforme ? null : nc,
+        Fait: false
+    };
+
+    fermerEtat();
+
+    await modifierLigneMulti(id, champs);
+
+    if (!etatConforme) afficherToast('⚠️ Non-conformité enregistrée');
+}
 
 function fermerModalMesures() {
 
@@ -4903,6 +5147,10 @@ function ligneTacheAdmin(r) {
     }
 
     const obs = String(r.Observation || '').trim();
+	    const ee = etatEffectif(r);
+    if (ee === 'EN_COURS') tags.push(`🟠 En cours${valeurRenseignee(r.pct_avancement) ? ' ' + r.pct_avancement + ' %' : ''}`);
+    if (ee === 'ANNULE') tags.push('🚫 Annulé');
+    if (r.conforme === false) tags.push('⚠️ NC');
     const qui = [r.prenom, r.nom].filter(Boolean).join(' ');
 
     return `
