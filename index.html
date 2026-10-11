@@ -3190,18 +3190,6 @@ function rafraichirAffichageTaches() {
 			
             const etatEff = etatEffectif(item);
 
-            const boutonEtat = document.createElement('button');
-            boutonEtat.type = 'button';
-            boutonEtat.title = "État d'avancement";
-            boutonEtat.innerText = etatEff === 'EN_COURS' ? '🟠' : etatEff === 'ANNULE' ? '🚫' : '📊';
-            boutonEtat.className = 'w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-lg shrink-0';
-            boutonEtat.addEventListener('click', event => {
-                event.preventDefault();
-                event.stopPropagation();
-                ouvrirEtatTache(rowId);
-            });
-
-            ligne.appendChild(boutonEtat);
             if (tacheExigeQt(item)) {
 
                 const badgeQt = document.createElement('button');
@@ -3508,6 +3496,13 @@ function cocherTache(id, checkbox) {
             return;
         }
     }
+    /* Cocher = choisir d'abord l'état (En cours / Terminé / Annulé) */
+    if (checkbox.checked) {
+        checkbox.checked = false;
+        ouvrirEtatTache(id);
+        return;
+    }
+
     if (checkbox.checked && tacheExigeMesures(item)) {
         checkbox.checked = false;
         ouvrirModalMesures(id);
