@@ -797,7 +797,7 @@
         <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
 
             <p class="font-bold text-lg mb-1 text-gray-800 text-center">
-                📏 Hauteur & Désaxement
+                <span id="mesuresTitre">📏 Hauteur & Désaxement</span>
             </p>
 
             <p id="mesuresSupport"
@@ -805,7 +805,7 @@
             </p>
 
             <label class="block text-xs font-bold uppercase text-gray-600 mb-1">
-                Hauteur (<span id="uniteHauteurLabel">m</span>) *
+                <span id="libH">Hauteur</span> <span id="parH">(<span id="uniteHauteurLabel">m</span>)</span> *
             </label>
 
             <input type="number"
@@ -816,7 +816,7 @@
                    class="w-full p-2.5 border rounded-lg mb-3 text-sm">
 
             <label class="block text-xs font-bold uppercase text-gray-600 mb-1">
-                Désaxement (<span id="uniteDesaxementLabel">cm</span>) *
+                <span id="libD">Désaxement</span> <span id="parD">(<span id="uniteDesaxementLabel">cm</span>)</span> *
             </label>
 
             <input type="number"
@@ -828,7 +828,7 @@
 
             <p id="mesuresErreur"
                class="text-red-500 text-xs mb-3 hidden">
-                ⚠️ La hauteur et le désaxement sont obligatoires.
+                ⚠️ Les deux valeurs sont obligatoires.
             </p>
 
             <div class="flex gap-2">
@@ -2770,6 +2770,23 @@ function normaliserTexte(texte) {
 }
 
 
+/* Pose : appareil tendeur / chaise de relevage => relevés R1 et R2
+   (stockés dans les colonnes hauteur et desaxement) */
+function typeReleve(item) {
+    if (cleChapitre(item) !== 'pose') return false;
+    const t = normaliserTexte(item.Tache);
+    return t.includes('appareil tendeur') || t.includes('chaise de relevage');
+}
+
+function majLibellesMesures(item) {
+    const rel = typeReleve(item);
+    document.getElementById('mesuresTitre').innerText = rel ? '📏 Relevés R1 & R2' : '📏 Hauteur & Désaxement';
+    document.getElementById('libH').innerText = rel ? 'Relevé R1' : 'Hauteur';
+    document.getElementById('libD').innerText = rel ? 'Relevé R2' : 'Désaxement';
+    document.getElementById('parH').style.display = rel ? 'none' : '';
+    document.getElementById('parD').style.display = rel ? 'none' : '';
+}
+
 function tacheExigeMesures(item) {
 
     const texte =
@@ -2793,7 +2810,7 @@ function tacheExigeMesures(item) {
             'desax'
         );
 
-    return hauteur && desaxement;
+    return (hauteur && desaxement) || typeReleve(item);
 }
 
 
@@ -3284,10 +3301,9 @@ function rafraichirAffichageTaches() {
                 zoneMesures.className =
                     'text-xs bg-white border border-purple-200 rounded-lg p-2 text-purple-800';
 
-                zoneMesures.innerHTML =
-                    `📏 Hauteur : <b>${item.hauteur} ${UNITE_HAUTEUR}</b>
-                    &nbsp;&nbsp;|&nbsp;&nbsp;
-                    Désaxement : <b>${item.desaxement} ${UNITE_DESAXEMENT}</b>`;
+                zoneMesures.innerHTML = typeReleve(item)
+                    ? `📏 R1 : <b>${item.hauteur}</b> &nbsp;&nbsp;|&nbsp;&nbsp; R2 : <b>${item.desaxement}</b>`
+                    : `📏 Hauteur : <b>${item.hauteur} ${UNITE_HAUTEUR}</b> &nbsp;&nbsp;|&nbsp;&nbsp; Désaxement : <b>${item.desaxement} ${UNITE_DESAXEMENT}</b>`;
 
                 div.appendChild(
                     zoneMesures
@@ -3598,8 +3614,8 @@ function ouvrirModalMesures(id) {
      * IMPORTANT :
      * on garde l'ID Supabase.
      */
-    idMesuresEnCours =
-        id;
+    idMesuresEnCours = id;
+    majLibellesMesures(item);
 
     document.getElementById(
         'uniteHauteurLabel'
@@ -3856,7 +3872,7 @@ async function validerMesures() {
     ) {
 
         erreur.innerText =
-            "⚠️ La hauteur et le désaxement sont obligatoires.";
+            "⚠️ Les deux valeurs sont obligatoires.";
 
         erreur.classList.remove(
             'hidden'
@@ -5128,7 +5144,7 @@ function ligneTacheAdmin(r) {
     const tags = [];
 
     if (valeurRenseignee(r.hauteur) || valeurRenseignee(r.desaxement)) {
-        tags.push(`📏 H ${r.hauteur ?? '?'} ${UNITE_HAUTEUR} · D ${r.desaxement ?? '?'} ${UNITE_DESAXEMENT}`);
+        tags.push(typeReleve(r) ? `📏 R1 ${r.hauteur ?? '?'} · R2 ${r.desaxement ?? '?'}` : `📏 H ${r.hauteur ?? '?'} ${UNITE_HAUTEUR} · D ${r.desaxement ?? '?'} ${UNITE_DESAXEMENT}`);
     }
 
     if (tacheExigeQt(r)) {
@@ -5406,13 +5422,13 @@ function copierTravaux() {
                 r.hauteur != null
             )
                 texte +=
-                    ` | H=${r.hauteur} m`;
+                    ` | ${typeReleve(r) ? 'R1=' + r.hauteur : 'H=' + r.hauteur + ' m'}`;
 
             if (
                 r.desaxement != null
             )
                 texte +=
-                    ` | D=${r.desaxement} cm`;
+                    ` | ${typeReleve(r) ? 'R2=' + r.desaxement : 'D=' + r.desaxement + ' cm'}`;
 
             texte +=
                 '\n\n';
@@ -5791,7 +5807,7 @@ async function genererEtPartagerPDF() {
 
     doc.autoTable({
         startY: 56,
-        head: [['Chantier', 'Support', 'Type', 'Tâche', 'Fait', 'Date', 'H (m)', 'D (cm)', 'Qté', 'BRH', 'Observation']],
+        head: [['Chantier', 'Support', 'Type', 'Tâche', 'Fait', 'Date', 'H (m) / R1', 'D (cm) / R2', 'Qté', 'BRH', 'Observation']],
         body: modifies.map(r => [
             r.Chantier || '',
             r.Support || '',
