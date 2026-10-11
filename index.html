@@ -826,6 +826,11 @@
                    placeholder="Ex : -12"
                    class="w-full p-2.5 border rounded-lg mb-3 text-sm">
 
+            <div id="zoneDesax2" class="hidden">
+                <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Désaxement 2 (<span>cm</span>) *</label>
+                <input type="number" step="any" inputmode="decimal" id="inputDesaxement2" placeholder="Ex : 8" class="w-full p-2.5 border rounded-lg mb-3 text-sm">
+            </div>
+
             <p id="mesuresErreur"
                class="text-red-500 text-xs mb-3 hidden">
                 ⚠️ Les deux valeurs sont obligatoires.
@@ -2778,11 +2783,18 @@ function typeReleve(item) {
     return t.includes('appareil tendeur') || t.includes('chaise de relevage');
 }
 
+/* Tâche « (Axe) » : 1 hauteur + 2 désaxements, stockés « d1/d2 » dans desaxement (colonne en texte) */
+function typeAxe(item) {
+    return normaliserTexte(item.Tache).includes('(axe)');
+}
+
 function majLibellesMesures(item) {
     const rel = typeReleve(item);
+    const axe = typeAxe(item);
     document.getElementById('mesuresTitre').innerText = rel ? '📏 Relevés R1 & R2' : '📏 Hauteur & Désaxement';
     document.getElementById('libH').innerText = rel ? 'Relevé R1' : 'Hauteur';
-    document.getElementById('libD').innerText = rel ? 'Relevé R2' : 'Désaxement';
+    document.getElementById('libD').innerText = rel ? 'Relevé R2' : axe ? 'Désaxement 1' : 'Désaxement';
+    document.getElementById('zoneDesax2').classList.toggle('hidden', !axe);
     document.getElementById('parH').style.display = rel ? 'none' : '';
     document.getElementById('parD').style.display = rel ? 'none' : '';
 }
@@ -2810,7 +2822,7 @@ function tacheExigeMesures(item) {
             'desax'
         );
 
-    return (hauteur && desaxement) || typeReleve(item);
+    return (hauteur && desaxement) || typeReleve(item) || typeAxe(item);
 }
 
 
@@ -2825,6 +2837,8 @@ function valeurRenseignee(valeur) {
 
 
 function mesuresRemplies(item) {
+    if (typeAxe(item) && !String(item.desaxement ?? '').includes('/')) return false;
+
 
     return (
         valeurRenseignee(
@@ -3303,7 +3317,7 @@ function rafraichirAffichageTaches() {
 
                 zoneMesures.innerHTML = typeReleve(item)
                     ? `📏 R1 : <b>${item.hauteur}</b> &nbsp;&nbsp;|&nbsp;&nbsp; R2 : <b>${item.desaxement}</b>`
-                    : `📏 Hauteur : <b>${item.hauteur} ${UNITE_HAUTEUR}</b> &nbsp;&nbsp;|&nbsp;&nbsp; Désaxement : <b>${item.desaxement} ${UNITE_DESAXEMENT}</b>`;
+                    : `📏 Hauteur : <b>${item.hauteur} ${UNITE_HAUTEUR}</b> &nbsp;&nbsp;|&nbsp;&nbsp; Désaxement : <b>${String(item.desaxement).split('/').join(' / ')} ${UNITE_DESAXEMENT}</b>`;
 
                 div.appendChild(
                     zoneMesures
@@ -3641,14 +3655,11 @@ function ouvrirModalMesures(id) {
             ? item.hauteur
             : '';
 
-    document.getElementById(
-        'inputDesaxement'
-    ).value =
-        valeurRenseignee(
-            item.desaxement
-        )
-            ? item.desaxement
-            : '';
+    {
+        const parts = valeurRenseignee(item.desaxement) ? String(item.desaxement).split('/') : [];
+        document.getElementById('inputDesaxement').value = parts[0] ?? '';
+        document.getElementById('inputDesaxement2').value = parts[1] ?? '';
+    }
 
     document.getElementById(
         'mesuresErreur'
@@ -3862,13 +3873,18 @@ async function validerMesures() {
         );
 
     const erreur =
-        document.getElementById(
-            'mesuresErreur'
-        );
+        document.getElementById('mesuresErreur');
+
+    const itemM = trouverLigneParId(idMesuresEnCours);
+    const axeSaisie = !!itemM && typeAxe(itemM);
+    const desaxement2 = parseFloat(
+        document.getElementById('inputDesaxement2').value.replace(',', '.').trim()
+    );
 
     if (
         isNaN(hauteur) ||
-        isNaN(desaxement)
+        isNaN(desaxement) ||
+        (axeSaisie && isNaN(desaxement2))
     ) {
 
         erreur.innerText =
@@ -3894,7 +3910,7 @@ async function validerMesures() {
         {
             Fait:true,
             hauteur:hauteur,
-            desaxement:desaxement
+            desaxement: axeSaisie ? `${desaxement}/${desaxement2}` : desaxement
         }
     );
 }
