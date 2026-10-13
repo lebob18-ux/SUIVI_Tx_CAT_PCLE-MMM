@@ -7,7 +7,13 @@
 
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#2563eb">
-    <link rel="icon" href="icon-192.png" type="image/png">
+    <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
+    <link rel="icon" href="icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="SUTX">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -251,6 +257,14 @@
                 onclick="viderLocalStorageApp()"
                 style="color:#f87171;">
             🗑️ Vider le LocalStorage
+        </button>
+
+        <button type="button"
+                id="btnInstaller"
+                class="sidebar-action-btn"
+                onclick="installerApp()"
+                style="display:none;color:#34d399;">
+            📲 Installer l'application
         </button>
 
         <div style="padding:15px 20px;">
@@ -940,13 +954,26 @@
             <p id="etatSousTitre" class="text-xs text-gray-500 mb-1 text-center"></p>
             <p id="etatPrevu" class="text-xs text-blue-700 font-bold mb-3 text-center"></p>
 
-            <div class="flex gap-2 mb-3">
-                <button type="button" id="btnEtatEC" onclick="choisirEtat('EN_COURS')" class="flex-1 py-2 rounded-lg text-sm font-bold bg-gray-200 text-gray-700">🟠 En cours</button>
+            <div id="etatBtns" class="flex gap-2 mb-3"><button type="button" id="btnEtatEC" onclick="choisirEtat('EN_COURS')" class="flex-1 py-2 rounded-lg text-sm font-bold bg-gray-200 text-gray-700">🟠 En cours</button>
                 <button type="button" id="btnEtatTE" onclick="choisirEtat('TERMINE')" class="flex-1 py-2 rounded-lg text-sm font-bold bg-gray-200 text-gray-700">✅ Terminé</button>
                 <button type="button" id="btnEtatAN" onclick="choisirEtat('ANNULE')" class="flex-1 py-2 rounded-lg text-sm font-bold bg-gray-200 text-gray-700">🚫 Annulé</button>
             </div>
 
             <div id="etatDetails" class="hidden">
+
+                <div id="etatSecSous" class="hidden mb-3">
+                    <div class="flex items-center justify-between mb-1">
+                        <p class="text-xs font-bold uppercase text-gray-700">☑ Sous-travaux</p>
+                        <span id="sousResume" class="text-xs font-bold text-blue-700"></span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2.5 mb-2 overflow-hidden">
+                        <div id="sousBarre" class="h-2.5 rounded-full bg-blue-600" style="width:0%"></div>
+                    </div>
+                    <div class="flex justify-between text-[11px] font-bold text-gray-500 px-1"><span>FAIT</span><span>N/C</span></div>
+                    <div id="sousListe"></div>
+                    <p class="text-[11px] text-gray-500 mt-1">N/C = non concerné : retiré du calcul du pourcentage.</p>
+                </div>
+
 
                 <div id="etatSecMes" class="hidden mb-3 p-3 rounded-lg bg-purple-50 border border-purple-200">
                     <p class="text-xs font-bold uppercase text-purple-800 mb-2">📏 Mesures *</p>
@@ -1021,6 +1048,29 @@
     </div>
     
 <script>
+let invitationInstall = null;
+
+window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    invitationInstall = e;
+    const b = document.getElementById('btnInstaller');
+    if (b) b.style.display = 'block';
+});
+
+window.addEventListener('appinstalled', () => {
+    invitationInstall = null;
+    const b = document.getElementById('btnInstaller');
+    if (b) b.style.display = 'none';
+});
+
+async function installerApp() {
+    if (!invitationInstall) return;
+    invitationInstall.prompt();
+    await invitationInstall.userChoice;
+    invitationInstall = null;
+    document.getElementById('btnInstaller').style.display = 'none';
+}
+
 console.log("VERSION v2 chargée");/*bob*/
 /* ============================================================
    CONFIGURATION
@@ -1445,6 +1495,8 @@ async function chargerDonneesSupabase() {
 
         chargerDonneesLocalesCache();
     }
+
+    await chargerSousTravaux();
 
     initialiserSelecteursChantiers();
     rafraichirAffichageTaches();
@@ -3338,6 +3390,18 @@ function rafraichirAffichageTaches() {
                 }
             }
 
+            if (hasSous(item)) {
+
+                const cs = calcSous(item);
+                const badgeS = document.createElement('button');
+                badgeS.type = 'button';
+                badgeS.className = 'text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded font-bold shrink-0';
+                badgeS.innerText = `☑ ${cs.nOk}/${cs.nEff}${cs.nNc ? ' · ' + cs.nNc + ' N/C' : ''}`;
+                badgeS.addEventListener('click', () => ouvrirEtatTache(rowId));
+
+                ligne.appendChild(badgeS);
+            }
+
             /* BADGE MESURES */
 
             if (mesures) {
@@ -3655,6 +3719,14 @@ function cocherTache(id, checkbox) {
         return;
     }
 
+    if (hasSous(item)) {
+
+        checkbox.checked = estFait(item);
+        ouvrirEtatTache(id);
+
+        return;
+    }
+
     if (!checkbox.checked && estFait(item)) {
 
         if (!confirm(`Décocher cette tâche ?\n${item.Tache || ''}`)) {
@@ -3860,6 +3932,171 @@ async function validerNcLevee() {
     afficherToast('✅ Non-conformité levée');
 }
 
+/* ============================================================
+   SOUS-TRAVAUX (catalogue Supabase) : FAIT / N/C par sous-travail
+============================================================ */
+
+let modeleSous = [];
+let suiviSous = [];
+let sousIdx = new Map();
+
+function indexerSous() {
+    sousIdx = new Map();
+    suiviSous.forEach(r => {
+        const k = String(r.tache_id);
+        if (!sousIdx.has(k)) sousIdx.set(k, new Map());
+        sousIdx.get(k).set(String(r.modele_id), r.statut);
+    });
+}
+
+function statutSous(tacheId, modeleId) {
+    const m = sousIdx.get(String(tacheId));
+    return m ? (m.get(String(modeleId)) || null) : null;
+}
+
+function modelesPour(item) {
+    if (!item || !item.Tache || item.id === undefined || item.id === null) return [];
+    const k = normaliserTexte(item.Tache).trim();
+    return modeleSous
+        .filter(m => m.actif !== false && normaliserTexte(m.tache).trim() === k)
+        .sort((a, b) => (a.ordre || 0) - (b.ordre || 0) || a.id - b.id);
+}
+
+function hasSous(item) { return modelesPour(item).length > 0; }
+
+/* % = sous-travaux faits / (total - non concernés), avec poids facultatif */
+function calcSous(item, get) {
+    const lire = get || (m => statutSous(item.id, m.id));
+    let tot = 0, ok = 0, nc = 0, nOk = 0, nNc = 0;
+    const mod = modelesPour(item);
+    mod.forEach(m => {
+        const p = Number(m.poids) || 1, st = lire(m);
+        tot += p;
+        if (st === 'FAIT') { ok += p; nOk++; }
+        else if (st === 'NON_CONCERNE') { nc += p; nNc++; }
+    });
+    const eff = tot - nc;
+    return { n: mod.length, nOk, nNc, nEff: mod.length - nNc, eff, ok, pct: eff > 0 ? Math.round(ok / eff * 100) : 0 };
+}
+
+function etatDepuisSous(c) {
+    if (c.eff <= 0) return { etat: 'ANNULE', pct_avancement: null, Fait: false };
+    if (c.ok >= c.eff) return { etat: 'TERMINE', pct_avancement: null, Fait: true };
+    if (c.ok > 0) return { etat: 'EN_COURS', pct_avancement: c.pct, Fait: false };
+    return { etat: null, pct_avancement: null, Fait: false };
+}
+
+async function chargerTable(table) {
+    let tout = [];
+    for (let debut = 0; ; debut += 1000) {
+        const { data, error } = await supabaseClient.from(table).select('*').order('id', { ascending: true }).range(debut, debut + 999);
+        if (error) throw error;
+        tout = tout.concat(data || []);
+        if (!data || data.length < 1000) break;
+    }
+    return tout;
+}
+
+async function chargerSousTravaux() {
+    try {
+        if (!estEnLigne) throw new Error('hors ligne');
+        modeleSous = await chargerTable('sous_travaux_modele');
+        suiviSous = await chargerTable('sous_travaux_suivi');
+        localStorage.setItem('cache_sutx_sous', JSON.stringify({ modeleSous, suiviSous }));
+    } catch (e) {
+        try {
+            const c = JSON.parse(localStorage.getItem('cache_sutx_sous') || '{}');
+            modeleSous = c.modeleSous || [];
+            suiviSous = c.suiviSous || [];
+        } catch (e2) {}
+    }
+    indexerSous();
+}
+
+function majSousLocal(tacheId, ops) {
+    ops.forEach(o => {
+        suiviSous = suiviSous.filter(r => !(String(r.tache_id) === String(tacheId) && String(r.modele_id) === String(o.modele_id)));
+        if (o.statut) suiviSous.push({ tache_id: tacheId, modele_id: o.modele_id, statut: o.statut });
+    });
+    indexerSous();
+    try { localStorage.setItem('cache_sutx_sous', JSON.stringify({ modeleSous, suiviSous })); } catch (e) {}
+}
+
+async function appliquerSous(tacheId, ops) {
+
+    const aEcrire = ops.filter(o => o.statut).map(o => ({
+        tache_id: tacheId, modele_id: o.modele_id, statut: o.statut,
+        date_fait: dateDuPoste(), nom: userName, prenom: userPrenom, updated_at: new Date().toISOString()
+    }));
+    const aSupprimer = ops.filter(o => !o.statut).map(o => o.modele_id);
+
+    if (aEcrire.length) {
+        const { error } = await supabaseClient.from('sous_travaux_suivi').upsert(aEcrire, { onConflict: 'tache_id,modele_id' });
+        if (error) throw error;
+    }
+
+    if (aSupprimer.length) {
+        const { error } = await supabaseClient.from('sous_travaux_suivi').delete().eq('tache_id', tacheId).in('modele_id', aSupprimer);
+        if (error) throw error;
+    }
+}
+
+function enregistrerSousFileAttente(id, ops) {
+    let file = [];
+    try { file = JSON.parse(localStorage.getItem(FILE_ATTENTE_KEY) || '[]'); if (!Array.isArray(file)) file = []; } catch (e) { file = []; }
+    file.push({ type: 'sous', timestamp: Date.now(), id: id, ops: ops });
+    localStorage.setItem(FILE_ATTENTE_KEY, JSON.stringify(file));
+    logDiag(`📦 Sous-travaux ID ${id} enregistrés hors ligne.`);
+}
+
+/* Une NC levée n'est pas rouverte par un simple enregistrement */
+function champsConformite(item, nc) {
+    const leveeAvant = item.conforme === false && item.nc_levee === true;
+    if (etatConforme) return leveeAvant ? {} : { conforme: true, nc_description: null };
+    return { conforme: false, nc_description: nc, nc_levee: false, nc_levee_le: null, nc_levee_expl: null };
+}
+
+function construireSous(item) {
+    $id('sousListe').innerHTML = modelesPour(item).map(m => {
+        const st = statutSous(item.id, m.id);
+        return `<div class="flex items-center gap-3 py-2 border-b border-gray-100">
+            <input type="checkbox" class="w-7 h-7 shrink-0 accent-green-600" data-m="${m.id}" data-k="F" ${st === 'FAIT' ? 'checked' : ''} onchange="basculerSous(this)">
+            <span class="flex-1 text-sm font-medium text-gray-800">${escHtml(m.libelle)}</span>
+            <input type="checkbox" class="w-7 h-7 shrink-0 accent-gray-500" data-m="${m.id}" data-k="N" ${st === 'NON_CONCERNE' ? 'checked' : ''} onchange="basculerSous(this)">
+        </div>`;
+    }).join('');
+    majResumeSous();
+}
+
+function lireSousDom() {
+    const r = {};
+    document.querySelectorAll('#sousListe input[data-k]').forEach(el => {
+        const id = el.dataset.m;
+        if (!(id in r)) r[id] = null;
+        if (el.checked) r[id] = el.dataset.k === 'F' ? 'FAIT' : 'NON_CONCERNE';
+    });
+    return r;
+}
+
+function basculerSous(el) {
+    if (el.checked) {
+        const autre = document.querySelector(`#sousListe input[data-m="${el.dataset.m}"][data-k="${el.dataset.k === 'F' ? 'N' : 'F'}"]`);
+        if (autre) autre.checked = false;
+    }
+    majResumeSous();
+}
+
+function majResumeSous() {
+    const item = trouverLigneParId(etatIdEnCours);
+    if (!item) return;
+    const dom = lireSousDom();
+    const c = calcSous(item, m => dom[m.id] || null);
+    $id('sousResume').innerText = c.eff <= 0
+        ? 'Tout est non concerné : tâche annulée'
+        : `${c.pct} % · ${c.nOk}/${c.nEff} faits${c.nNc ? ' · ' + c.nNc + ' N/C' : ''}`;
+    $id('sousBarre').style.width = (c.eff > 0 ? c.pct : 0) + '%';
+}
+
 let etatIdEnCours = null;
 let etatChoisi = null;
 let etatConforme = true;
@@ -3883,7 +4120,7 @@ function ouvrirEtatTache(id) {
 
     etatIdEnCours = id;
     etatChoisi = null;
-    etatConforme = item.conforme !== false;
+    etatConforme = item.conforme !== false || item.nc_levee === true;
     etatBrh = item.brh === true ? true : item.brh === false ? false : null;
 
     const rel = typeReleve(item), axe = typeAxe(item), parts = String(item.desaxement ?? '').split('/');
@@ -3911,11 +4148,18 @@ function ouvrirEtatTache(id) {
     $id('etatProv').value = item.pend_prov ?? '';
     $id('etatProvDep').value = item.pend_prov_depose ?? '';
 
+    if (hasSous(item)) {
+        etatChoisi = 'SOUS';
+        construireSous(item);
+    }
+
     majEtatUI();
     ouvrirModal('divEtatModal');
 
-    const e = etatEffectif(item);
-    if (e) choisirEtat(e, true);
+    if (!hasSous(item)) {
+        const e = etatEffectif(item);
+        if (e) choisirEtat(e, true);
+    }
 }
 
 function fermerEtat() {
@@ -3929,7 +4173,7 @@ function majEtatUI() {
     if (!item) return;
 
     const s = sectionsTache(item), e = etatChoisi;
-    const ec = e === 'EN_COURS', te = e === 'TERMINE';
+    const ec = e === 'EN_COURS', te = e === 'TERMINE', sous = e === 'SOUS';
 
     [['btnEtatEC', 'EN_COURS'], ['btnEtatTE', 'TERMINE'], ['btnEtatAN', 'ANNULE']].forEach(([b, k]) => {
         $id(b).className = `flex-1 py-2 rounded-lg text-sm font-bold ${e === k ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`;
@@ -3942,7 +4186,9 @@ function majEtatUI() {
     $id('etatSecProv').classList.toggle('hidden', !s.prov);
     $id('etatPctZone').classList.toggle('hidden', !ec);
     $id('etatSecConf').classList.toggle('hidden', te);
-    $id('etatLibExpl').innerText = te ? 'Commentaire (facultatif)' : 'Explication *';
+    $id('etatLibExpl').innerText = (te || sous) ? 'Commentaire (facultatif)' : 'Explication *';
+    $id('etatBtns').classList.toggle('hidden', sous);
+    $id('etatSecSous').classList.toggle('hidden', !sous);
 
     $id('btnBrhOui').className = `flex-1 py-2 rounded-lg text-sm font-bold ${etatBrh === true ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700'}`;
     $id('btnBrhNon').className = `flex-1 py-2 rounded-lg text-sm font-bold ${etatBrh === false ? 'bg-red-600 text-white' : 'bg-gray-200 text-gray-700'}`;
@@ -4023,7 +4269,33 @@ async function validerEtat() {
         champs.pend_prov_depose = $id('etatProvDep').value.trim() || null;
     }
 
-    if (etatChoisi === 'TERMINE') {
+    if (etatChoisi === 'SOUS') {
+
+        const ncTxt = $id('etatNcDesc').value.trim();
+        if (!etatConforme && !ncTxt) return fail('Décris la non-conformité.');
+
+        const dom = lireSousDom();
+        const ops = [];
+
+        modelesPour(item).forEach(m => {
+            const nouveau = dom[m.id] || null;
+            if (nouveau !== (statutSous(id, m.id) || null)) ops.push({ modele_id: m.id, statut: nouveau });
+        });
+
+        if (ops.length) {
+            majSousLocal(id, ops);
+            let envoye = false;
+            if (estEnLigne) {
+                try { await appliquerSous(id, ops); envoye = true; }
+                catch (e) { logDiag(`❌ Sous-travaux ID ${id} : ${e.message || e}`); }
+            }
+            if (!envoye) enregistrerSousFileAttente(id, ops);
+        }
+
+        Object.assign(champs, etatDepuisSous(calcSous(item)), champsConformite(item, ncTxt));
+        if (expl) champs.explication = expl;
+
+    } else if (etatChoisi === 'TERMINE') {
 
         if (s.mes) {
             const h = num($id('etatHauteur').value), d = num($id('etatDesax').value), d2 = num($id('etatDesax2').value);
@@ -4068,9 +4340,7 @@ async function validerEtat() {
             etat: etatChoisi,
             pct_avancement: etatChoisi === 'EN_COURS' ? parseInt($id('etatPct').value, 10) : null,
             explication: expl,
-            conforme: etatConforme,
-            nc_description: etatConforme ? null : nc,
-            ...(etatConforme ? {} : { nc_levee: false, nc_levee_le: null, nc_levee_expl: null }),
+            ...champsConformite(item, nc),
             Fait: false
         });
     }
@@ -4650,6 +4920,18 @@ async function verifierEtSynchroniserFileAttente() {
         const action
         of fileAttente
     ) {
+        if (action && action.type === 'sous') {
+
+            try {
+                await appliquerSous(action.id, action.ops);
+            } catch (err) {
+                logDiag(`❌ Sous-travaux impossibles en synchro : ${err.message || err}`);
+                reste.push(action);
+            }
+
+            continue;
+        }
+
         if (action && action.type === 'insert') {
 
             try {
@@ -5250,7 +5532,7 @@ async function cocherToutSupport(
                 support
         )
             continue;
-			        if (tacheVerrouilleeFBM(item)) continue;
+			        if (tacheVerrouilleeFBM(item) || hasSous(item)) continue;
 
         if (estFait(item) === etat) continue;
         if (
