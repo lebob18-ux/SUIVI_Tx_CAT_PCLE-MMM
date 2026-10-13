@@ -4041,6 +4041,21 @@ async function appliquerSous(tacheId, ops) {
     }
 }
 
+async function resynchroniserSous(tacheId) {
+    try {
+        const { data, error } = await supabaseClient.from('sous_travaux_suivi').select('tache_id,modele_id,statut').eq('tache_id', tacheId);
+        if (error) throw error;
+        suiviSous = suiviSous.filter(r => String(r.tache_id) !== String(tacheId)).concat(data || []);
+        indexerSous();
+        try { localStorage.setItem('cache_sutx_sous', JSON.stringify({ modeleSous, suiviSous })); } catch (e) {}
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+let sousModifie = false;
+
 function enregistrerSousFileAttente(id, ops) {
     let file = [];
     try { file = JSON.parse(localStorage.getItem(FILE_ATTENTE_KEY) || '[]'); if (!Array.isArray(file)) file = []; } catch (e) { file = []; }
@@ -4079,6 +4094,7 @@ function lireSousDom() {
 }
 
 function basculerSous(el) {
+    sousModifie = true;
     if (el.checked) {
         const autre = document.querySelector(`#sousListe input[data-m="${el.dataset.m}"][data-k="${el.dataset.k === 'F' ? 'N' : 'F'}"]`);
         if (autre) autre.checked = false;
@@ -4150,7 +4166,14 @@ function ouvrirEtatTache(id) {
 
     if (hasSous(item)) {
         etatChoisi = 'SOUS';
+        sousModifie = false;
         construireSous(item);
+
+        if (estEnLigne) {
+            resynchroniserSous(id).then(ok => {
+                if (ok && etatIdEnCours === id && !sousModifie) construireSous(item);
+            });
+        }
     }
 
     majEtatUI();
@@ -4290,6 +4313,7 @@ async function validerEtat() {
                 catch (e) { logDiag(`❌ Sous-travaux ID ${id} : ${e.message || e}`); }
             }
             if (!envoye) enregistrerSousFileAttente(id, ops);
+            else await resynchroniserSous(id);
         }
 
         Object.assign(champs, etatDepuisSous(calcSous(item)), champsConformite(item, ncTxt));
