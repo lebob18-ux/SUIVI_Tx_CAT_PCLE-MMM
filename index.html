@@ -937,68 +937,84 @@
         <div class="bg-white p-5 rounded-xl shadow-2xl w-full max-w-sm overflow-y-auto" style="max-height:92vh;">
 
             <p class="font-bold text-lg mb-1 text-gray-800 text-center">📊 État d'avancement</p>
-            <p id="etatSousTitre" class="text-xs text-gray-500 mb-3 text-center"></p>
+            <p id="etatSousTitre" class="text-xs text-gray-500 mb-1 text-center"></p>
+            <p id="etatPrevu" class="text-xs text-blue-700 font-bold mb-3 text-center"></p>
 
             <div class="flex gap-2 mb-3">
-                <button type="button" id="btnEtatEC" onclick="choisirEtat('EN_COURS')"
-                        class="flex-1 py-2 rounded-lg text-sm font-bold bg-gray-200 text-gray-700">🟠 En cours</button>
-                <button type="button" onclick="choisirEtat('TERMINE')"
-                        class="flex-1 py-2 rounded-lg text-sm font-bold bg-gray-200 text-gray-700">✅ Terminé</button>
-                <button type="button" id="btnEtatAN" onclick="choisirEtat('ANNULE')"
-                        class="flex-1 py-2 rounded-lg text-sm font-bold bg-gray-200 text-gray-700">🚫 Annulé</button>
+                <button type="button" id="btnEtatEC" onclick="choisirEtat('EN_COURS')" class="flex-1 py-2 rounded-lg text-sm font-bold bg-gray-200 text-gray-700">🟠 En cours</button>
+                <button type="button" id="btnEtatTE" onclick="choisirEtat('TERMINE')" class="flex-1 py-2 rounded-lg text-sm font-bold bg-gray-200 text-gray-700">✅ Terminé</button>
+                <button type="button" id="btnEtatAN" onclick="choisirEtat('ANNULE')" class="flex-1 py-2 rounded-lg text-sm font-bold bg-gray-200 text-gray-700">🚫 Annulé</button>
             </div>
 
             <div id="etatDetails" class="hidden">
 
+                <div id="etatSecMes" class="hidden mb-3 p-3 rounded-lg bg-purple-50 border border-purple-200">
+                    <p class="text-xs font-bold uppercase text-purple-800 mb-2">📏 Mesures *</p>
+                    <label id="etatLibH" class="block text-xs font-bold text-gray-600 mb-1">Hauteur</label>
+                    <input type="number" step="any" inputmode="decimal" id="etatHauteur" class="w-full p-2.5 border rounded-lg mb-2 text-sm">
+                    <label id="etatLibD" class="block text-xs font-bold text-gray-600 mb-1">Désaxement</label>
+                    <input type="number" step="any" inputmode="decimal" id="etatDesax" class="w-full p-2.5 border rounded-lg mb-2 text-sm">
+                    <div id="etatZoneD2" class="hidden">
+                        <label class="block text-xs font-bold text-gray-600 mb-1">Désaxement 2 (cm)</label>
+                        <input type="number" step="any" inputmode="decimal" id="etatDesax2" class="w-full p-2.5 border rounded-lg text-sm">
+                    </div>
+                </div>
+
+                <div id="etatSecBrh" class="hidden mb-3 p-3 rounded-lg bg-orange-50 border border-orange-200">
+                    <p class="text-xs font-bold uppercase text-orange-800 mb-2">🔨 BRH utilisé ? *</p>
+                    <div class="flex gap-2">
+                        <button type="button" id="btnBrhOui" onclick="choisirBrh(true)" class="flex-1 py-2 rounded-lg text-sm font-bold bg-gray-200 text-gray-700">✅ Oui</button>
+                        <button type="button" id="btnBrhNon" onclick="choisirBrh(false)" class="flex-1 py-2 rounded-lg text-sm font-bold bg-gray-200 text-gray-700">❌ Non</button>
+                    </div>
+                </div>
+
+                <div id="etatSecQt" class="hidden mb-3 p-3 rounded-lg bg-amber-50 border border-amber-200">
+                    <label class="block text-xs font-bold uppercase text-amber-800 mb-1">🔢 Quantité réalisée</label>
+                    <select id="etatSelQt" onchange="majPctDepuisQt()" class="w-full p-2.5 border rounded-lg text-sm bg-white"></select>
+                </div>
+
+                <div id="etatSecProv" class="hidden mb-3 p-3 rounded-lg bg-teal-50 border border-teal-200">
+                    <p class="text-xs font-bold uppercase text-teal-800 mb-2">🔧 Pendules provisoires</p>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div><label class="block text-xs font-bold text-gray-600 mb-1">Posés</label>
+                            <input type="number" min="0" inputmode="numeric" id="etatProv" class="w-full p-2.5 border rounded-lg text-sm"></div>
+                        <div><label class="block text-xs font-bold text-gray-600 mb-1">Déposés</label>
+                            <input type="number" min="0" inputmode="numeric" id="etatProvDep" class="w-full p-2.5 border rounded-lg text-sm"></div>
+                    </div>
+                </div>
+
                 <div id="etatPctZone" class="mb-3">
-                    <label class="block text-xs font-bold uppercase text-gray-600 mb-1">
-                        Avancement : <span id="etatPctVal">50</span> %
-                    </label>
+                    <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Avancement : <span id="etatPctVal">50</span> %</label>
                     <input type="range" id="etatPct" min="0" max="100" step="5" value="50"
-                           oninput="document.getElementById('etatPctVal').innerText=this.value"
-                           class="w-full">
+                           oninput="document.getElementById('etatPctVal').innerText=this.value" class="w-full">
                 </div>
 
-                <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Explication *</label>
-                <textarea id="etatExplication" rows="3"
-                          placeholder="Où en est-on, pourquoi..."
-                          class="w-full p-2.5 border rounded-lg mb-3 text-sm"></textarea>
+                <label id="etatLibExpl" class="block text-xs font-bold uppercase text-gray-600 mb-1">Explication *</label>
+                <textarea id="etatExplication" rows="3" placeholder="Où en est-on, pourquoi..." class="w-full p-2.5 border rounded-lg mb-3 text-sm"></textarea>
 
-                <label class="block text-xs font-bold uppercase text-gray-600 mb-1">
-                    Ce qui est fait est-il conforme ?
-                </label>
-                <div class="flex gap-2 mb-3">
-                    <button type="button" id="btnConfOui" onclick="choisirConforme(true)"
-                            class="flex-1 py-2 rounded-lg text-sm font-bold bg-green-600 text-white">✅ Oui</button>
-                    <button type="button" id="btnConfNon" onclick="choisirConforme(false)"
-                            class="flex-1 py-2 rounded-lg text-sm font-bold bg-gray-200 text-gray-700">⚠️ Non</button>
-                </div>
-
-                <div id="etatNcZone" class="hidden mb-3">
-                    <label class="block text-xs font-bold uppercase text-gray-600 mb-1">
-                        Description de la non-conformité *
-                    </label>
-                    <textarea id="etatNcDesc" rows="3"
-                              placeholder="Décris précisément la non-conformité..."
-                              class="w-full p-2.5 border border-red-300 rounded-lg text-sm"></textarea>
+                <div id="etatSecConf">
+                    <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Ce qui est fait est-il conforme ?</label>
+                    <div class="flex gap-2 mb-3">
+                        <button type="button" id="btnConfOui" onclick="choisirConforme(true)" class="flex-1 py-2 rounded-lg text-sm font-bold bg-green-600 text-white">✅ Oui</button>
+                        <button type="button" id="btnConfNon" onclick="choisirConforme(false)" class="flex-1 py-2 rounded-lg text-sm font-bold bg-gray-200 text-gray-700">⚠️ Non</button>
+                    </div>
+                    <div id="etatNcZone" class="hidden mb-3">
+                        <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Description de la non-conformité *</label>
+                        <textarea id="etatNcDesc" rows="3" placeholder="Décris précisément la non-conformité..." class="w-full p-2.5 border border-red-300 rounded-lg text-sm"></textarea>
+                    </div>
                 </div>
 
                 <p id="etatErreur" class="text-red-500 text-xs mb-3 hidden"></p>
 
-                <button type="button" onclick="validerEtat()"
-                        class="w-full bg-blue-600 hover:bg-blue-700 text-white p-2.5 rounded-lg font-bold text-sm">
-                    💾 Enregistrer
-                </button>
+                <button type="button" onclick="validerEtat()" class="w-full bg-blue-600 hover:bg-blue-700 text-white p-2.5 rounded-lg font-bold text-sm">💾 Enregistrer</button>
             </div>
 
-            <button type="button" onclick="fermerEtat()"
-                    class="w-full mt-3 bg-gray-200 hover:bg-gray-300 text-gray-800 p-2.5 rounded-lg font-bold text-sm">
-                ❌ Fermer
-            </button>
+            <button type="button" onclick="fermerEtat()" class="w-full mt-3 bg-gray-200 hover:bg-gray-300 text-gray-800 p-2.5 rounded-lg font-bold text-sm">❌ Fermer</button>
 
         </div>
     </div>
-	<div id="divZoomImg"
+
+    <div id="divZoomImg"
          class="app-modal fixed inset-0 bg-black bg-opacity-90 items-center justify-center z-[2000] p-2"
          onclick="fermerZoomImage()">
         <img id="imgZoomCible" alt="Zoom" class="max-w-full max-h-full object-contain">
@@ -3032,7 +3048,7 @@ function rafraichirAffichageTaches() {
         );
 
     const visibles = lignes.filter(r =>
-        (ongletTaches === 'faits' ? estFait(r) : !estFait(r)) &&
+        (ongletTaches === 'faits' ? estFait(r) : true) &&
         (!filtre || String(r.Tache || '').toLowerCase().includes(filtre))
     );
 
@@ -3084,8 +3100,26 @@ function rafraichirAffichageTaches() {
     visibles.sort(
         (a, b) =>
             rangChapitre(cleChapitre(a)) - rangChapitre(cleChapitre(b)) ||
-            cleChapitre(a).localeCompare(cleChapitre(b))
+            cleChapitre(a).localeCompare(cleChapitre(b)) ||
+            (estFait(a) ? 1 : 0) - (estFait(b) ? 1 : 0)
     );
+
+    if (ongletTaches !== 'faits' && total > 0 && faites === total) {
+        const bandeau = document.createElement('div');
+        bandeau.className = 'px-3 py-2 rounded-lg bg-green-50 border border-green-200 text-xs font-bold text-green-800';
+        bandeau.textContent = '🎉 Tout est fait sur ce support. Les tâches faites restent visibles en grisé.';
+        containerTaches.appendChild(bandeau);
+    }
+
+    const lignesFbm = lignes.filter(tacheVerrouilleeFBM);
+    if (lignesFbm.length) {
+        const lf = document.createElement('div');
+        lf.className = 'flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 rounded-lg bg-slate-100 border border-slate-200 text-xs text-slate-700';
+        lf.innerHTML = '<span class="font-bold">🔒 FBM</span>' + lignesFbm.map(r =>
+            `<span>${escHtml(r.Tache)} ${estFait(r) ? '✔' + (r.date_fait ? ' ' + r.date_fait.split('-').reverse().join('/') : '') : '⏳'}</span>`
+        ).join('');
+        containerTaches.appendChild(lf);
+    }
 
     visibles.forEach(
         item => {
@@ -3097,6 +3131,8 @@ function rafraichirAffichageTaches() {
              */
             const rowId =
                 item.id;
+
+            if (tacheVerrouilleeFBM(item)) return;
 
             const coche =
                 [
@@ -3176,6 +3212,8 @@ function rafraichirAffichageTaches() {
 
             titre.innerText =
                 item.Tache || '';
+            titre.style.cursor = 'pointer';
+            titre.addEventListener('click', () => ouvrirEtatTache(rowId));
 
 
             if (item.isCustom) {
@@ -3418,6 +3456,11 @@ function rafraichirAffichageTaches() {
                     ` · par ${[item.prenom, item.nom].filter(Boolean).join(' ') || '—'}`;
 
                 div.appendChild(meta);
+            }
+
+            if (coche && ongletTaches !== 'faits') {
+                div.style.opacity = '0.55';
+                titre.style.textDecoration = 'line-through';
             }
 
             ajouterDansChapitre(
@@ -3820,10 +3863,17 @@ async function validerNcLevee() {
 let etatIdEnCours = null;
 let etatChoisi = null;
 let etatConforme = true;
+let etatBrh = null;
+
+const $id = i => document.getElementById(i);
 
 function etatEffectif(r) {
     if (estFait(r)) return 'TERMINE';
     return (r.etat && r.etat !== 'TERMINE') ? r.etat : null;
+}
+
+function sectionsTache(item) {
+    return { mes: tacheExigeMesures(item), brh: tacheExigeBRH(item), qt: tacheExigeQt(item), prov: typePendulage(item) };
 }
 
 function ouvrirEtatTache(id) {
@@ -3834,21 +3884,38 @@ function ouvrirEtatTache(id) {
     etatIdEnCours = id;
     etatChoisi = null;
     etatConforme = item.conforme !== false;
+    etatBrh = item.brh === true ? true : item.brh === false ? false : null;
 
-    document.getElementById('etatSousTitre').innerText = `${item.Support || ''} — ${item.Tache || ''}`;
-    document.getElementById('etatPct').value = valeurRenseignee(item.pct_avancement) ? item.pct_avancement : 50;
-    document.getElementById('etatPctVal').innerText = document.getElementById('etatPct').value;
-    document.getElementById('etatExplication').value = item.explication || '';
-    document.getElementById('etatNcDesc').value = item.nc_description || '';
-    document.getElementById('etatErreur').classList.add('hidden');
-    document.getElementById('etatDetails').classList.add('hidden');
+    const rel = typeReleve(item), axe = typeAxe(item), parts = String(item.desaxement ?? '').split('/');
 
-    majBoutonsEtat();
-    majBoutonsConforme();
+    $id('etatSousTitre').innerText = `${item.Support || ''} — ${item.Tache || ''}`;
+    $id('etatPrevu').innerText = libellePrevu(item);
+    $id('etatPct').value = valeurRenseignee(item.pct_avancement) ? item.pct_avancement : 50;
+    $id('etatPctVal').innerText = $id('etatPct').value;
+    $id('etatExplication').value = item.explication || '';
+    $id('etatNcDesc').value = item.nc_description || '';
+    $id('etatErreur').classList.add('hidden');
+
+    $id('etatLibH').innerText = rel ? 'Relevé R1' : `Hauteur (${UNITE_HAUTEUR})`;
+    $id('etatLibD').innerText = rel ? 'Relevé R2' : axe ? `Désaxement 1 (${UNITE_DESAXEMENT})` : `Désaxement (${UNITE_DESAXEMENT})`;
+    $id('etatZoneD2').classList.toggle('hidden', !axe);
+    $id('etatHauteur').value = item.hauteur ?? '';
+    $id('etatDesax').value = parts[0] ?? '';
+    $id('etatDesax2').value = parts[1] ?? '';
+
+    const sel = $id('etatSelQt');
+    sel.innerHTML = '';
+    for (let n = 0; n <= qtMax(item); n++) sel.add(new Option(String(n), String(n)));
+    sel.value = String(Math.min(qtMax(item), parseInt(item.qt_realisee, 10) || 0));
+
+    $id('etatProv').value = item.pend_prov ?? '';
+    $id('etatProvDep').value = item.pend_prov_depose ?? '';
+
+    majEtatUI();
     ouvrirModal('divEtatModal');
 
     const e = etatEffectif(item);
-    if (e === 'EN_COURS' || e === 'ANNULE') choisirEtat(e);
+    if (e) choisirEtat(e, true);
 }
 
 function fermerEtat() {
@@ -3856,97 +3923,165 @@ function fermerEtat() {
     etatIdEnCours = null;
 }
 
-function majBoutonsEtat() {
-    const actif = 'bg-blue-600 text-white';
-    const inactif = 'bg-gray-200 text-gray-700';
-    [['btnEtatEC', 'EN_COURS'], ['btnEtatAN', 'ANNULE']].forEach(([b, e]) => {
-        document.getElementById(b).className =
-            `flex-1 py-2 rounded-lg text-sm font-bold ${etatChoisi === e ? actif : inactif}`;
+function majEtatUI() {
+
+    const item = trouverLigneParId(etatIdEnCours);
+    if (!item) return;
+
+    const s = sectionsTache(item), e = etatChoisi;
+    const ec = e === 'EN_COURS', te = e === 'TERMINE';
+
+    [['btnEtatEC', 'EN_COURS'], ['btnEtatTE', 'TERMINE'], ['btnEtatAN', 'ANNULE']].forEach(([b, k]) => {
+        $id(b).className = `flex-1 py-2 rounded-lg text-sm font-bold ${e === k ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`;
     });
-}
 
-function majBoutonsConforme() {
-    document.getElementById('btnConfOui').className =
-        `flex-1 py-2 rounded-lg text-sm font-bold ${etatConforme ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700'}`;
-    document.getElementById('btnConfNon').className =
-        `flex-1 py-2 rounded-lg text-sm font-bold ${!etatConforme ? 'bg-red-600 text-white' : 'bg-gray-200 text-gray-700'}`;
-    document.getElementById('etatNcZone').classList.toggle('hidden', etatConforme);
-}
+    $id('etatDetails').classList.toggle('hidden', !e);
+    $id('etatSecMes').classList.toggle('hidden', !(te && s.mes));
+    $id('etatSecBrh').classList.toggle('hidden', !(te && s.brh));
+    $id('etatSecQt').classList.toggle('hidden', !((te || ec) && s.qt));
+    $id('etatSecProv').classList.toggle('hidden', !s.prov);
+    $id('etatPctZone').classList.toggle('hidden', !ec);
+    $id('etatSecConf').classList.toggle('hidden', te);
+    $id('etatLibExpl').innerText = te ? 'Commentaire (facultatif)' : 'Explication *';
 
-function choisirConforme(v) {
-    etatConforme = v;
+    $id('btnBrhOui').className = `flex-1 py-2 rounded-lg text-sm font-bold ${etatBrh === true ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700'}`;
+    $id('btnBrhNon').className = `flex-1 py-2 rounded-lg text-sm font-bold ${etatBrh === false ? 'bg-red-600 text-white' : 'bg-gray-200 text-gray-700'}`;
+
     majBoutonsConforme();
 }
 
-function choisirEtat(e) {
+function majBoutonsConforme() {
+    $id('btnConfOui').className = `flex-1 py-2 rounded-lg text-sm font-bold ${etatConforme ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700'}`;
+    $id('btnConfNon').className = `flex-1 py-2 rounded-lg text-sm font-bold ${!etatConforme ? 'bg-red-600 text-white' : 'bg-gray-200 text-gray-700'}`;
+    $id('etatNcZone').classList.toggle('hidden', etatConforme);
+}
 
-    if (e === 'TERMINE') {
-        terminerDepuisEtat();
+function choisirConforme(v) { etatConforme = v; majBoutonsConforme(); }
+function choisirBrh(v) { etatBrh = v; majEtatUI(); }
+
+function majPctDepuisQt() {
+    const item = trouverLigneParId(etatIdEnCours);
+    if (!item || etatChoisi !== 'EN_COURS' || qtMax(item) < 1) return;
+    const p = Math.min(95, Math.round((parseInt($id('etatSelQt').value, 10) || 0) / qtMax(item) * 100 / 5) * 5);
+    $id('etatPct').value = p;
+    $id('etatPctVal').innerText = p;
+}
+
+function choisirEtat(e, ouverture) {
+
+    const item = trouverLigneParId(etatIdEnCours);
+    if (!item) return;
+
+    if (e === 'TERMINE' && estFait(item) === false && tacheVerrouilleeFBM(item)) {
+        afficherToast('🔒 Cette tâche se coche depuis FBM');
         return;
     }
 
     etatChoisi = e;
-    document.getElementById('etatDetails').classList.remove('hidden');
-    document.getElementById('etatPctZone').classList.toggle('hidden', e !== 'EN_COURS');
-    majBoutonsEtat();
+
+    const s = sectionsTache(item);
+
+    /* Aucune saisie en plus : Terminé en un seul clic, comme avant */
+    if (e === 'TERMINE' && !ouverture && !s.mes && !s.brh && !s.qt && !s.prov) {
+        validerEtat();
+        return;
+    }
+
+    if (e === 'TERMINE' && !ouverture && s.qt) $id('etatSelQt').value = String(qtMax(item));
+
+    majEtatUI();
 }
 
-/* Terminé = même parcours qu'une case cochée (verrou FBM, mesures, BRH, quantité) */
-function terminerDepuisEtat() {
+async function nouvelHistQt(id, item, val) {
 
-    const id = etatIdEnCours;
-    const item = trouverLigneParId(id);
+    let base = Array.isArray(item.qt_historique) ? item.qt_historique : [];
 
-    fermerEtat();
+    if (estEnLigne) {
+        try {
+            const { data } = await supabaseClient.from(TABLE_SUPABASE).select('qt_historique').eq('id', id).single();
+            if (data && Array.isArray(data.qt_historique)) base = data.qt_historique;
+        } catch (e) {}
+    }
 
-    if (!item || estFait(item)) return;
-
-    if (tacheVerrouilleeFBM(item)) { afficherToast('🔒 Cette tâche se coche depuis FBM'); return; }
-    if (tacheExigeMesures(item)) { ouvrirModalMesures(id); return; }
-    if (tacheExigeBRH(item)) { ouvrirChoix(id, 'brh'); return; }
-    if (tacheExigeQt(item)) { ouvrirChoix(id, 'qt'); return; }
-
-    modifierLigneMulti(id, { Fait: true, etat: 'TERMINE' });
+    return [...base, { qt: val, date: dateDuPoste(), nom: userName, prenom: userPrenom }];
 }
 
 async function validerEtat() {
 
     const id = etatIdEnCours;
-    if (!id || !etatChoisi) return;
+    const item = trouverLigneParId(id);
+    if (!item || !etatChoisi) return;
 
-    const expl = document.getElementById('etatExplication').value.trim();
-    const nc = document.getElementById('etatNcDesc').value.trim();
-    const err = document.getElementById('etatErreur');
+    const s = sectionsTache(item), err = $id('etatErreur');
+    const fail = m => { err.innerText = '⚠️ ' + m; err.classList.remove('hidden'); };
+    const num = v => parseFloat(String(v).replace(',', '.').trim());
+    const expl = $id('etatExplication').value.trim();
+    const champs = {};
 
-    if (!expl) {
-        err.innerText = "⚠️ L'explication est obligatoire.";
-        err.classList.remove('hidden');
-        return;
+    if (s.prov) {
+        champs.pend_prov = $id('etatProv').value.trim() || null;
+        champs.pend_prov_depose = $id('etatProvDep').value.trim() || null;
     }
 
-    if (!etatConforme && !nc) {
-        err.innerText = "⚠️ Décris la non-conformité.";
-        err.classList.remove('hidden');
-        return;
+    if (etatChoisi === 'TERMINE') {
+
+        if (s.mes) {
+            const h = num($id('etatHauteur').value), d = num($id('etatDesax').value), d2 = num($id('etatDesax2').value);
+            if (isNaN(h) || isNaN(d) || (typeAxe(item) && isNaN(d2))) return fail('Toutes les mesures sont obligatoires.');
+            champs.hauteur = h;
+            champs.desaxement = typeAxe(item) ? `${d}/${d2}` : String(d);
+        }
+
+        if (s.brh) {
+            if (etatBrh === null) return fail('Indique si le BRH a été utilisé.');
+            champs.brh = etatBrh;
+        }
+
+        if (s.qt) {
+            const q = parseInt($id('etatSelQt').value, 10) || 0;
+            if (q < qtMax(item)) return fail(`Pour Terminé, la quantité doit être complète (${qtMax(item)}). Sinon choisis En cours.`);
+            if (q !== (parseInt(item.qt_realisee, 10) || 0)) champs.qt_historique = await nouvelHistQt(id, item, q);
+            champs.qt_realisee = q;
+        }
+
+        champs.Fait = true;
+        champs.etat = 'TERMINE';
+        if (expl) champs.explication = expl;
+
+    } else {
+
+        const nc = $id('etatNcDesc').value.trim();
+
+        if (!expl) return fail("L'explication est obligatoire.");
+        if (!etatConforme && !nc) return fail('Décris la non-conformité.');
+
+        if (s.qt && etatChoisi === 'EN_COURS') {
+            const q = parseInt($id('etatSelQt').value, 10) || 0;
+            if (q >= qtMax(item)) return fail('Quantité complète : choisis Terminé.');
+            if (q !== (parseInt(item.qt_realisee, 10) || 0)) {
+                champs.qt_historique = await nouvelHistQt(id, item, q);
+                champs.qt_realisee = q;
+            }
+        }
+
+        Object.assign(champs, {
+            etat: etatChoisi,
+            pct_avancement: etatChoisi === 'EN_COURS' ? parseInt($id('etatPct').value, 10) : null,
+            explication: expl,
+            conforme: etatConforme,
+            nc_description: etatConforme ? null : nc,
+            ...(etatConforme ? {} : { nc_levee: false, nc_levee_le: null, nc_levee_expl: null }),
+            Fait: false
+        });
     }
 
-    const champs = {
-        etat: etatChoisi,
-        pct_avancement: etatChoisi === 'EN_COURS'
-            ? parseInt(document.getElementById('etatPct').value, 10)
-            : null,
-        explication: expl,
-        conforme: etatConforme,
-        nc_description: etatConforme ? null : nc,
-        ...(etatConforme ? {} : { nc_levee: false, nc_levee_le: null, nc_levee_expl: null }),
-        Fait: false
-    };
+    const nouvelleNc = etatChoisi !== 'TERMINE' && !etatConforme;
 
     fermerEtat();
 
     await modifierLigneMulti(id, champs);
 
-    if (!etatConforme) afficherToast('⚠️ Non-conformité enregistrée');
+    if (nouvelleNc) afficherToast('⚠️ Non-conformité enregistrée');
 }
 
 function fermerModalMesures() {
@@ -4922,6 +5057,17 @@ async function validerAjoutTacheManuelle() {
         return;
     }
 
+
+    const dejaLa = rawData.find(r =>
+        r.Chantier === selectChantier.value &&
+        r.Support === selectSupport.value &&
+        cleChapitre(r) === cleChapitre({ type: typeChoisi }) &&
+        normaliserTexte(r.Tache).trim() === normaliserTexte(intitule).trim()
+    );
+
+    if (dejaLa && !confirm(`Cette tâche existe déjà sur ce support${estFait(dejaLa) ? ' (déjà faite)' : ''}.\nElle est visible dans la liste des tâches.\n\nLa créer quand même ?`)) {
+        return;
+    }
 
     const nouvelleLigne = {
         Chantier: selectChantier.value,
