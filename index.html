@@ -3168,7 +3168,7 @@ function rafraichirAffichageTaches() {
         const lf = document.createElement('div');
         lf.className = 'flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 rounded-lg bg-slate-100 border border-slate-200 text-xs text-slate-700';
         lf.innerHTML = '<span class="font-bold">🔒 FBM</span>' + lignesFbm.map(r =>
-            `<span>${escHtml(r.Tache)} ${estFait(r) ? '✔' + (r.date_fait ? ' ' + r.date_fait.split('-').reverse().join('/') : '') : '⏳'}</span>`
+            `<span>${escHtml(r.Tache)} ${estFait(r) ? '✔' + (r.date_fait ? ' ' + r.date_fait.split('-').reverse().join('/') : '') : (r.admin_etat === 'TERMINE' ? '📌 déclaré' : '⏳')}</span>`
         ).join('');
         containerTaches.appendChild(lf);
     }
@@ -3431,6 +3431,13 @@ function rafraichirAffichageTaches() {
 
 
             /* VALEURS MESURES */
+            if (item.admin_etat && !coche) {
+                const za = document.createElement('div');
+                za.className = 'text-xs rounded-lg p-2 border bg-sky-50 border-sky-200 text-sky-800';
+                za.textContent = `📌 Déclaré ${item.admin_etat === 'TERMINE' ? 'terminé' : item.admin_etat === 'ANNULE' ? 'annulé' : 'en cours' + (item.admin_pct != null ? ' à ' + item.admin_pct + ' %' : '')} par ${item.admin_par || 'admin'} le ${String(item.admin_le || '').split('-').reverse().join('/')} — à confirmer sur le terrain`;
+                div.appendChild(za);
+            }
+
             const lp = libellePrevu(item);
             if (lp) {
                 const zp = document.createElement('div');
@@ -4203,8 +4210,8 @@ function majEtatUI() {
     });
 
     $id('etatDetails').classList.toggle('hidden', !e);
-    $id('etatSecMes').classList.toggle('hidden', !(te && s.mes));
-    $id('etatSecBrh').classList.toggle('hidden', !(te && s.brh));
+    $id('etatSecMes').classList.toggle('hidden', !((te || sous) && s.mes));
+    $id('etatSecBrh').classList.toggle('hidden', !((te || sous) && s.brh));
     $id('etatSecQt').classList.toggle('hidden', !((te || ec) && s.qt));
     $id('etatSecProv').classList.toggle('hidden', !s.prov);
     $id('etatPctZone').classList.toggle('hidden', !ec);
@@ -4299,6 +4306,24 @@ async function validerEtat() {
 
         const dom = lireSousDom();
         const ops = [];
+
+        /* Mesures / BRH : facultatifs en cours de route, obligatoires pour terminer */
+        const deriveDom = etatDepuisSous(calcSous(item, m => dom[m.id] || null));
+
+        if (s.mes) {
+            const h = num($id('etatHauteur').value), d = num($id('etatDesax').value), d2 = num($id('etatDesax2').value);
+            const complet = !(isNaN(h) || isNaN(d) || (typeAxe(item) && isNaN(d2)));
+            if (deriveDom.Fait && !complet) return fail('Toutes les mesures sont obligatoires pour terminer.');
+            if (complet) {
+                champs.hauteur = h;
+                champs.desaxement = typeAxe(item) ? `${d}/${d2}` : String(d);
+            }
+        }
+
+        if (s.brh) {
+            if (deriveDom.Fait && etatBrh === null) return fail('Indique si le BRH a été utilisé.');
+            if (etatBrh !== null) champs.brh = etatBrh;
+        }
 
         modelesPour(item).forEach(m => {
             const nouveau = dom[m.id] || null;
