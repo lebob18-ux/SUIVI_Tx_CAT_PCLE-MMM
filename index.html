@@ -2276,6 +2276,7 @@ function peuplerSidebarSupports() {
         container.innerHTML =
             '<p style="color:#6b7280;font-size:12px;text-align:center;padding:12px 0;">Aucun support pour ce filtre.</p>';
     }
+	    logDiag(`SIDEBAR filtre=${filtreTypeSupports} | supports affichés=${container.children.length}`);
 }
 
 
@@ -3040,7 +3041,7 @@ function rafraichirAffichageTaches() {
                 r.Support ===
                 support
         );
-
+    logDiag(`TACHES filtre=${filtreTypeSupports} | support=${support} | lignes=${lignes.length} / ${rawData.filter(r => r.Chantier === chantier && r.Support === support).length} | types=${[...new Set(lignes.map(cleChapitre))].join(',')}`);
     const visibles = lignes.filter(r =>
         (ongletTaches === 'faits' ? estFait(r) : true) &&
         (!filtre || String(r.Tache || '').toLowerCase().includes(filtre))
