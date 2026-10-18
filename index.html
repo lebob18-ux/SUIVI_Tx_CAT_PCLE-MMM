@@ -1414,10 +1414,8 @@ async function chargerDonneesSupabase() {
         rawData.filter(r => r.modifie === true).map(r => String(r.id))
     );
 
-    const lignes = rawData.filter(r =>
-        r.Chantier === chantier &&
-        r.Support === support &&
-        typeVisibleFiltre(r)
+    const customAvant = new Set(
+        rawData.filter(r => r.isCustom === true).map(r => String(r.id))
     );
 
     const localesNonSynchro = rawData.filter(r => r._insertionLocale === true);
@@ -3033,14 +3031,12 @@ function rafraichirAffichageTaches() {
         return;
     }
 
-    const lignes =
-        rawData.filter(
-            r =>
-                r.Chantier ===
-                chantier &&
-                r.Support ===
-                support
-        );
+    const lignes = rawData.filter(r =>
+        r.Chantier === chantier &&
+        r.Support === support &&
+        typeVisibleFiltre(r)
+    );
+	
     logDiag(`TACHES filtre=${filtreTypeSupports} | support=${support} | lignes=${lignes.length} / ${rawData.filter(r => r.Chantier === chantier && r.Support === support).length} | types=${[...new Set(lignes.map(cleChapitre))].join(',')}`);
     const visibles = lignes.filter(r =>
         (ongletTaches === 'faits' ? estFait(r) : true) &&
