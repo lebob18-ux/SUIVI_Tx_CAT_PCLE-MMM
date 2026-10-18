@@ -2181,6 +2181,7 @@ function typeVisibleFiltre(r) {
 function choisirFiltreTypeSupports(t) {
     filtreTypeSupports = t;
     peuplerSidebarSupports();
+    rafraichirAffichageTaches();
 }
 
 function majBoutonsFiltreType() {
@@ -2190,11 +2191,29 @@ function majBoutonsFiltreType() {
         b.style.color = actif ? '#fff' : '#aaa';
     });
 }
+function diagnosticTypes() {
 
+    const chantier = selectChantier.value;
+    const lignes = rawData.filter(r => r.Chantier === chantier);
+
+    const compte = {};
+    lignes.forEach(r => {
+        const k = `${JSON.stringify(r.type)}=>${cleChapitre(r)}`;
+        compte[k] = (compte[k] || 0) + 1;
+    });
+
+    const tous = new Set(lignes.map(r => r.Support));
+    const avecDepose = new Set(lignes.filter(r => cleChapitre(r) === 'depose').map(r => r.Support));
+    const avecAutre = new Set(lignes.filter(r => cleChapitre(r) !== 'depose').map(r => r.Support));
+    const lesDeux = [...avecDepose].filter(s => avecAutre.has(s)).length;
+
+    logDiag(`FILTRE v3 = ${filtreTypeSupports} | types : ${JSON.stringify(compte)}`);
+    logDiag(`Supports : ${tous.size} | avec dépose : ${avecDepose.size} | avec autre : ${avecAutre.size} | les deux : ${lesDeux}`);
+}
 function peuplerSidebarSupports() {
 
     majBoutonsFiltreType();
-
+    diagnosticTypes();
     const chantier = selectChantier.value;
 
     const filtre = document.getElementById('filtreSupportInput').value.toLowerCase();
