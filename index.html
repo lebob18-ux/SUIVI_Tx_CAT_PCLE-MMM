@@ -2213,7 +2213,11 @@ function peuplerSidebarSupports() {
 
     supports.forEach(support => {
 
-        const lignes = lignesChantier.filter(r => r.Support === support);
+           const lignes = rawData.filter(r =>
+        r.Chantier === chantier &&
+        r.Support === support &&
+        (filtreTypeSupports === 'all' || cleChapitre(r) === filtreTypeSupports)
+    );
 
         const faites = lignes.filter(estFait).length;
 
@@ -5216,7 +5220,7 @@ async function cocherToutSupport(
         )
             continue;
 			        if (tacheVerrouilleeFBM(item)) continue;
-
+        if (filtreTypeSupports !== 'all' && cleChapitre(item) !== filtreTypeSupports) continue;
         if (estFait(item) === etat) continue;
         if (
             etat &&
