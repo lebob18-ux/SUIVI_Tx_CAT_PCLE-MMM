@@ -2172,10 +2172,22 @@ function peuplerSidebarChantiers() {
 ============================================================ */
 
 let filtreTypeSupports = 'all';
+function supportContientAnc(r) {
+    return /(^|[^a-z])anc/.test(normaliserTexte(r.Support));
+}
+
 function typeVisibleFiltre(r) {
     const c = cleChapitre(r);
+
     if (filtreTypeSupports === 'depose') return c === 'depose';
-    if (filtreTypeSupports === 'pose') return c !== 'depose';
+
+    if (filtreTypeSupports === 'pose') {
+        if (c === 'depose') return false;
+        if (c === 'pose_anc') return supportContientAnc(r);
+        if (c === 'pose_support') return !supportContientAnc(r);
+        return true;
+    }
+
     return true;
 }
 function choisirFiltreTypeSupports(t) {
