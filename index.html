@@ -1414,8 +1414,10 @@ async function chargerDonneesSupabase() {
         rawData.filter(r => r.modifie === true).map(r => String(r.id))
     );
 
-    const customAvant = new Set(
-        rawData.filter(r => r.isCustom === true).map(r => String(r.id))
+    const lignes = rawData.filter(r =>
+        r.Chantier === chantier &&
+        r.Support === support &&
+        typeVisibleFiltre(r)
     );
 
     const localesNonSynchro = rawData.filter(r => r._insertionLocale === true);
