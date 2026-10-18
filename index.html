@@ -2172,7 +2172,12 @@ function peuplerSidebarChantiers() {
 ============================================================ */
 
 let filtreTypeSupports = 'all';
-
+function typeVisibleFiltre(r) {
+    const c = cleChapitre(r);
+    if (filtreTypeSupports === 'depose') return c === 'depose';
+    if (filtreTypeSupports === 'pose') return c !== 'depose';
+    return true;
+}
 function choisirFiltreTypeSupports(t) {
     filtreTypeSupports = t;
     peuplerSidebarSupports();
@@ -2201,8 +2206,7 @@ function peuplerSidebarSupports() {
 
     /* Lignes du chantier, restreintes au type choisi (Pose / Dépose) */
     const lignesChantier = rawData.filter(r =>
-        r.Chantier === chantier &&
-        (filtreTypeSupports === 'all' || cleChapitre(r) === filtreTypeSupports)
+        r.Chantier === chantier && typeVisibleFiltre(r)
     );
 
     const supports = [...new Set(lignesChantier.map(r => r.Support).filter(Boolean))]
@@ -2213,10 +2217,10 @@ function peuplerSidebarSupports() {
 
     supports.forEach(support => {
 
-           const lignes = rawData.filter(r =>
+    const lignes = rawData.filter(r =>
         r.Chantier === chantier &&
         r.Support === support &&
-        (filtreTypeSupports === 'all' || cleChapitre(r) === filtreTypeSupports)
+        typeVisibleFiltre(r)
     );
 
         const faites = lignes.filter(estFait).length;
@@ -5220,7 +5224,7 @@ async function cocherToutSupport(
         )
             continue;
 			        if (tacheVerrouilleeFBM(item)) continue;
-        if (filtreTypeSupports !== 'all' && cleChapitre(item) !== filtreTypeSupports) continue;
+        if (!typeVisibleFiltre(item)) continue;
         if (estFait(item) === etat) continue;
         if (
             etat &&
