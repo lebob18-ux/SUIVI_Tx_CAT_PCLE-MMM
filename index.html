@@ -311,6 +311,14 @@
                        style="width:100%;padding:8px;box-sizing:border-box;border-radius:4px;border:1px solid #444;background:#222;color:#fff;font-size:13px;">
 
             </div>
+			            <div id="filtreTypeSupports" style="display:flex;gap:6px;margin-bottom:12px;">
+                <button type="button" data-type="all" onclick="choisirFiltreTypeSupports('all')"
+                        style="flex:1;padding:8px;font-size:12px;font-weight:bold;border:none;border-radius:6px;cursor:pointer;">Tous</button>
+                <button type="button" data-type="pose" onclick="choisirFiltreTypeSupports('pose')"
+                        style="flex:1;padding:8px;font-size:12px;font-weight:bold;border:none;border-radius:6px;cursor:pointer;">🔩 Pose</button>
+                <button type="button" data-type="depose" onclick="choisirFiltreTypeSupports('depose')"
+                        style="flex:1;padding:8px;font-size:12px;font-weight:bold;border:none;border-radius:6px;cursor:pointer;">🔧 Dépose</button>
+            </div>
             <label style="display:flex;align-items:center;gap:8px;color:#9ca3af;font-size:13px;margin-bottom:12px;">
                 <input type="checkbox" id="masquerTermines" checked onchange="filtrerListeSupportsDroite()">
                 Masquer les supports terminés
@@ -2163,125 +2171,82 @@ function peuplerSidebarChantiers() {
    SIDEBAR SUPPORTS
 ============================================================ */
 
+let filtreTypeSupports = 'all';
+
+function choisirFiltreTypeSupports(t) {
+    filtreTypeSupports = t;
+    peuplerSidebarSupports();
+}
+
+function majBoutonsFiltreType() {
+    document.querySelectorAll('#filtreTypeSupports button').forEach(b => {
+        const actif = b.dataset.type === filtreTypeSupports;
+        b.style.background = actif ? '#2563eb' : '#333';
+        b.style.color = actif ? '#fff' : '#aaa';
+    });
+}
+
 function peuplerSidebarSupports() {
 
-    const chantier =
-        selectChantier.value;
+    majBoutonsFiltreType();
 
-    const filtre =
-        document.getElementById(
-            'filtreSupportInput'
-        ).value.toLowerCase();
+    const chantier = selectChantier.value;
 
-    const supports =
-        [
-            ...new Set(
-                rawData
-                    .filter(
-                        r =>
-                            r.Chantier ===
-                            chantier
-                    )
-                    .map(
-                        r =>
-                            r.Support
-                    )
-                    .filter(Boolean)
-            )
-        ]
-        .filter(
-            s =>
-                s.toLowerCase()
-                    .includes(
-                        filtre
-                    )
-        );
+    const filtre = document.getElementById('filtreSupportInput').value.toLowerCase();
 
-    const container =
-        document.getElementById(
-            'sidebarSupportsContainer'
-        );
+    const masquerTermines = document.getElementById('masquerTermines')?.checked;
 
-    container.innerHTML =
-        '';
+    const container = document.getElementById('sidebarSupportsContainer');
+    container.innerHTML = '';
 
-supports.sort((a, b) =>
-    String(a).localeCompare(
-        String(b),
-        'fr',
-        {
-            numeric: true,
-            sensitivity: 'base'
-        }
-    )
-);
-const masquerTermines = document.getElementById('masquerTermines')?.checked;
-supports.forEach(
-    support => {
-
-            const lignes =
-                rawData.filter(
-                    r =>
-                        r.Chantier ===
-                        chantier &&
-                        r.Support ===
-                        support
-                );
-
-            const faites =
-                lignes.filter(
-                    r =>
-                        [
-                            'vrai',
-                            'true',
-                            '1'
-                        ].includes(
-                            String(r.Fait)
-                                .toLowerCase()
-                                .trim()
-                        )
-                ).length;
-            if (masquerTermines && lignes.length && faites === lignes.length) return;
-            const bouton =
-                document.createElement(
-                    'button'
-                );
-
-            bouton.type =
-                'button';
-
-            bouton.style.cssText =
-                "width:100%;text-align:left;padding:10px 14px;border-radius:6px;font-size:13px;background:#222;color:#ccc;border:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;";
-
-            bouton.innerHTML =
-                `<span>${support}</span>
-                 <span style="font-size:11px;background:#333;padding:2px 6px;border-radius:4px;color:#fff;">
-                    ${faites}/${lignes.length}
-                 </span>`;
-
-            bouton.onclick =
-                () => {
-
-                    selectSupport.value =
-                        support;
-
-                    selectSupport.dispatchEvent(
-                        new Event('change')
-                    );
-
-                    document.getElementById(
-                        'labelSupportActif'
-                    ).innerText =
-                        support;
-
-                    fermerToutesSidebars();
-                };
-
-            container.appendChild(
-                bouton
-            );
-        }
+    /* Lignes du chantier, restreintes au type choisi (Pose / Dépose) */
+    const lignesChantier = rawData.filter(r =>
+        r.Chantier === chantier &&
+        (filtreTypeSupports === 'all' || cleChapitre(r) === filtreTypeSupports)
     );
+
+    const supports = [...new Set(lignesChantier.map(r => r.Support).filter(Boolean))]
+        .filter(s => s.toLowerCase().includes(filtre))
+        .sort((a, b) =>
+            String(a).localeCompare(String(b), 'fr', { numeric: true, sensitivity: 'base' })
+        );
+
+    supports.forEach(support => {
+
+        const lignes = lignesChantier.filter(r => r.Support === support);
+
+        const faites = lignes.filter(estFait).length;
+
+        if (masquerTermines && lignes.length && faites === lignes.length) return;
+
+        const bouton = document.createElement('button');
+        bouton.type = 'button';
+        bouton.style.cssText =
+            "width:100%;text-align:left;padding:10px 14px;border-radius:6px;font-size:13px;background:#222;color:#ccc;border:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;";
+
+        bouton.innerHTML =
+            `<span>${escHtml(support)}</span>
+             <span style="font-size:11px;background:#333;padding:2px 6px;border-radius:4px;color:#fff;">
+                ${faites}/${lignes.length}
+             </span>`;
+
+        bouton.onclick = () => {
+
+            selectSupport.value = support;
+            selectSupport.dispatchEvent(new Event('change'));
+
+            document.getElementById('labelSupportActif').innerText = support;
+
+            fermerToutesSidebars();
+        };
+
+        container.appendChild(bouton);
+    });
+
+    if (!container.children.length) {
+        container.innerHTML =
+            '<p style="color:#6b7280;font-size:12px;text-align:center;padding:12px 0;">Aucun support pour ce filtre.</p>';
+    }
 }
 
 
