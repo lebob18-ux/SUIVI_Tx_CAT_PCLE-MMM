@@ -2222,6 +2222,15 @@ function diagnosticTypes() {
     logDiag(`FILTRE v3 = ${filtreTypeSupports} | types : ${JSON.stringify(compte)}`);
     logDiag(`Supports : ${tous.size} | avec dépose : ${avecDepose.size} | avec autre : ${avecAutre.size} | les deux : ${lesDeux}`);
 }
+	/* Dépose = support finissant par « _D » ; Pose = tous les autres */
+function supportDansFiltre(support) {
+
+    if (filtreTypeSupports === 'all') return true;
+
+    const estD = /_d$/i.test(String(support).trim());
+
+    return filtreTypeSupports === 'depose' ? estD : !estD;
+}
 function peuplerSidebarSupports() {
 
     majBoutonsFiltreType();
@@ -2235,12 +2244,17 @@ function peuplerSidebarSupports() {
     const container = document.getElementById('sidebarSupportsContainer');
     container.innerHTML = '';
 
-    /* Lignes du chantier, restreintes au type choisi (Pose / Dépose) */
-    const lignesChantier = rawData.filter(r =>
-        r.Chantier === chantier && typeVisibleFiltre(r)
-    );
+    /* Lignes du chantier regroupées par support */
+    const parSupport = {};
 
-    const supports = [...new Set(lignesChantier.map(r => r.Support).filter(Boolean))]
+    rawData
+        .filter(r => r.Chantier === chantier && r.Support)
+        .forEach(r => {
+            (parSupport[r.Support] = parSupport[r.Support] || []).push(r);
+        });
+
+    const supports = Object.keys(parSupport)
+        .filter(s => supportDansFiltre(s))
         .filter(s => s.toLowerCase().includes(filtre))
         .sort((a, b) =>
             String(a).localeCompare(String(b), 'fr', { numeric: true, sensitivity: 'base' })
@@ -2248,11 +2262,7 @@ function peuplerSidebarSupports() {
 
     supports.forEach(support => {
 
-    const lignes = rawData.filter(r =>
-        r.Chantier === chantier &&
-        r.Support === support &&
-        typeVisibleFiltre(r)
-    );
+        const lignes = parSupport[support].filter(typeVisibleFiltre);
 
         const faites = lignes.filter(estFait).length;
 
@@ -2286,7 +2296,8 @@ function peuplerSidebarSupports() {
         container.innerHTML =
             '<p style="color:#6b7280;font-size:12px;text-align:center;padding:12px 0;">Aucun support pour ce filtre.</p>';
     }
-	    logDiag(`SIDEBAR filtre=${filtreTypeSupports} | supports affichés=${container.children.length}`);
+
+    logDiag(`SIDEBAR filtre=${filtreTypeSupports} | supports affichés=${container.children.length}`);
 }
 
 
