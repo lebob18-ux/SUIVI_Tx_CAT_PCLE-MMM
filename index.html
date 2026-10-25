@@ -2859,8 +2859,11 @@ function majLibellesMesures(item) {
     document.getElementById('libH').innerText = rel ? 'Relevé R1' : 'Hauteur';
     document.getElementById('libD').innerText = rel ? 'Relevé R2' : axe ? 'Désaxement 1' : 'Désaxement';
     document.getElementById('zoneDesax2').classList.toggle('hidden', !axe);
-    document.getElementById('parH').style.display = rel ? 'none' : '';
-    document.getElementById('parD').style.display = rel ? 'none' : '';
+    // Les relevés R1 et R2 sont des valeurs numériques en centimètres.
+    document.getElementById('parH').style.display = '';
+    document.getElementById('parD').style.display = '';
+    document.getElementById('uniteHauteurLabel').innerText = rel ? 'cm' : UNITE_HAUTEUR;
+    document.getElementById('uniteDesaxementLabel').innerText = rel ? 'cm' : UNITE_DESAXEMENT;
 }
 
 function tacheExigeMesures(item) {
@@ -3910,8 +3913,8 @@ function ouvrirEtatTache(id) {
     $id('etatNcDesc').value = item.nc_description || '';
     $id('etatErreur').classList.add('hidden');
 
-    $id('etatLibH').innerText = rel ? 'Relevé R1' : `Hauteur (${UNITE_HAUTEUR})`;
-    $id('etatLibD').innerText = rel ? 'Relevé R2' : axe ? `Désaxement 1 (${UNITE_DESAXEMENT})` : `Désaxement (${UNITE_DESAXEMENT})`;
+    $id('etatLibH').innerText = rel ? 'Relevé R1 (cm)' : `Hauteur (${UNITE_HAUTEUR})`;
+    $id('etatLibD').innerText = rel ? 'Relevé R2 (cm)' : axe ? `Désaxement 1 (${UNITE_DESAXEMENT})` : `Désaxement (${UNITE_DESAXEMENT})`;
     $id('etatZoneD2').classList.toggle('hidden', !axe);
     $id('etatHauteur').value = item.hauteur ?? '';
     $id('etatDesax').value = parts[0] ?? '';
@@ -4168,8 +4171,9 @@ async function validerMesures() {
         (axeSaisie && isNaN(desaxement2))
     ) {
 
-        erreur.innerText =
-            "⚠️ Les deux valeurs sont obligatoires.";
+        erreur.innerText = itemM && typeReleve(itemM)
+            ? "⚠️ Saisis les deux relevés R1 et R2 en cm."
+            : "⚠️ Les deux valeurs sont obligatoires.";
 
         erreur.classList.remove(
             'hidden'
@@ -4186,14 +4190,18 @@ async function validerMesures() {
 
     fermerModalMesures();
 
-    await modifierLigneMulti(
-        id,
-        {
-            Fait:true,
-            hauteur:hauteur,
-            desaxement: axeSaisie ? `${desaxement}/${desaxement2}` : desaxement
-        }
-    );
+    const estReleveR1R2 = !!itemM && typeReleve(itemM);
+
+    const maj = {
+        hauteur: hauteur,
+        desaxement: axeSaisie ? `${desaxement}/${desaxement2}` : desaxement
+    };
+
+    // Pour une chaise de relevage / un appareil tendeur, enregistrer R1/R2
+    // ne signifie pas que les réglages sont terminés : ne pas cocher la tâche.
+    if (!estReleveR1R2) maj.Fait = true;
+
+    await modifierLigneMulti(id, maj);
 }
 
 
