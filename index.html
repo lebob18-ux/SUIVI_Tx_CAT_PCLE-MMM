@@ -13,7 +13,6 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <style>
@@ -136,11 +135,7 @@
                 <select id="selectChantier"><option value="">Choisir...</option></select>
                 <select id="selectSupport" disabled><option value="">Choisir...</option></select>
             </div>
-            <div id="sectionActionsRapides" class="hidden flex flex-wrap items-center justify-between gap-2 mb-4 bg-gray-50 p-3 rounded-lg border">
-                <div class="flex flex-wrap gap-2">
-                    <button type="button" onclick="cocherToutSupport(true)" class="bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-1.5 rounded-lg text-xs font-bold transition">✅ Tout cocher</button>
-                    <button type="button" onclick="cocherToutSupport(false)" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-bold transition">❌ Tout décocher</button>
-                </div>
+            <div id="sectionActionsRapides" class="hidden flex items-center justify-end gap-2 mb-4 bg-gray-50 p-3 rounded-lg border">
                 <div class="flex items-center gap-2">
                     <span id="badgeProgressionSupport" class="text-xs font-bold bg-blue-600 text-white px-2.5 py-1 rounded-full">0 / 0 (0%)</span>
                 </div>
@@ -343,9 +338,9 @@
     </div>
     
 <script>
-console.log("VERSION v2 chargée");
+console.log("VERSION v3 chargée");
 
-const APP_NAME = "suivi_sutx_v2";
+const APP_NAME = "suivi_sutx_v3";
 const CACHE_KEY = `cache_${APP_NAME}`;
 const TABLE_SUPABASE = "suivi_sutx_v2";
 const FILE_ATTENTE_KEY = "file_attente_sutx";
@@ -1151,7 +1146,6 @@ function ouvrirModalAjoutTache() {
     const selectTache = document.getElementById('selectTacheExistante');
     selectTache.innerHTML = '<option value="">-- Choisir une tâche existante ou saisir ci-dessous --</option>';
     
-    // Récupérer la liste sans doublons de toutes les tâches de toute la table
     const tachesUniques = [...new Set(rawData.map(r => r.Tache).filter(Boolean))].sort((a, b) => a.localeCompare(b));
     tachesUniques.forEach(t => {
         selectTache.add(new Option(t, t));
@@ -1166,7 +1160,6 @@ function choisirTacheExistante() {
     const val = document.getElementById('selectTacheExistante').value;
     if (val) {
         document.getElementById('inputNouvelleTache').value = val;
-        // Retrouver le type associé si possible
         const trouve = rawData.find(r => r.Tache === val);
         if (trouve && trouve.type) {
             document.getElementById('selectTypeNouvelleTache').value = cleChapitre(trouve);
@@ -1620,32 +1613,48 @@ function genererEtPartagerPDFSession() {
         return;
     }
 
+    let texteCorps = `📋 Rapport de Session - SUTX\nChantier : ${chantier}\nDate : ${new Date().toLocaleDateString()}\nOpérateur : ${userName} ${userPrenom}\n\n`;
+    
+    const parSupport = {};
+    lignesSession.forEach(r => {
+        (parSupport[r.Support] = parSupport[r.Support] || []).push(r);
+    });
+
+    Object.keys(parSupport).forEach(support => {
+        texteCorps += `--- SUPPORT : ${support} ---\n`;
+        parSupport[support].forEach(t => {
+            texteCorps += `* [${t.type || 'tâche'}] ${t.Tache} -> ${t.etat || 'TERMINE'}\n`;
+            if (t.Observation) texteCorps += `  Obs: ${t.Observation}\n`;
+        });
+        texteCorps += `\n`;
+    });
+
+    // Génération PDF native 100% fiable sans dépendance externe de tableau
+    doc.setFont("Helvetica", "bold");
     doc.setFontSize(16);
     doc.setTextColor(37, 99, 235);
     doc.text(`Rapport de Session - SUTX`, 14, 20);
     
-    doc.setFontSize(11);
+    doc.setFont("Helvetica", "normal");
+    doc.setFontSize(10);
     doc.setTextColor(100, 100, 100);
     doc.text(`Chantier : ${chantier} | Date : ${new Date().toLocaleDateString()} | Opérateur : ${userName} ${userPrenom}`, 14, 28);
 
-    const dataTable = [];
-    lignesSession.forEach(t => {
-        dataTable.push([
-            t.Support || '',
-            t.type || '',
-            t.Tache || '',
-            t.etat || 'TERMINE',
-            t.Observation || ''
-        ]);
-    });
+    doc.setDrawColor(200, 200, 200);
+    doc.line(14, 32, 196, 32);
 
-    doc.autoTable({
-        startY: 35,
-        head: [['Support', 'Chapitre', 'Tâche', 'État', 'Observation']],
-        body: dataTable,
-        theme: 'grid',
-        headStyles: { fillColor: [37, 99, 235] },
-        styles: { fontSize: 9 }
+    let y = 40;
+    doc.setFontSize(10);
+    doc.setTextColor(50, 50, 50);
+
+    const lignesTextePDF = doc.splitTextToSize(texteCorps, 180);
+    lignesTextePDF.forEach(ligne => {
+        if (y > 280) {
+            doc.addPage();
+            y = 20;
+        }
+        doc.text(ligne, 14, y);
+        y += 6;
     });
 
     const pdfBlob = doc.output('blob');
@@ -1655,7 +1664,7 @@ function genererEtPartagerPDFSession() {
         navigator.share({
             files: [new File([pdfBlob], nomFichier, { type: 'application/pdf' })],
             title: 'Rapport de Session SUTX',
-            text: `Rapport pour le chantier ${chantier}`
+            text: texteCorps
         }).then(() => {
             tachesRealiseesSession = [];
             localStorage.removeItem('taches_session_sutx');
@@ -1663,7 +1672,8 @@ function genererEtPartagerPDFSession() {
         }).catch(() => {});
     } else {
         doc.save(nomFichier);
-        alert("📄 PDF téléchargé avec succès !");
+        navigator.clipboard.writeText(texteCorps).catch(() => {});
+        alert("📄 PDF téléchargé et récapitulatif copié !");
         tachesRealiseesSession = [];
         localStorage.removeItem('taches_session_sutx');
         rafraichirAffichageTaches();
@@ -1681,27 +1691,24 @@ function partagerPDFAvancement() {
         return;
     }
 
+    doc.setFont("Helvetica", "bold");
     doc.setFontSize(16);
     doc.setTextColor(37, 99, 235);
     doc.text(`Avancement Global - ${chantier}`, 14, 20);
 
-    const dataTable = [];
-    lignesChantier.forEach(t => {
-        dataTable.push([
-            t.Support || '',
-            t.type || '',
-            t.Tache || '',
-            estFait(t) ? 'Terminé' : (t.etat || 'À faire')
-        ]);
-    });
+    let y = 30;
+    doc.setFont("Helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(50, 50, 50);
 
-    doc.autoTable({
-        startY: 28,
-        head: [['Support', 'Chapitre', 'Tâche', 'État']],
-        body: dataTable,
-        theme: 'grid',
-        headStyles: { fillColor: [37, 99, 235] },
-        styles: { fontSize: 9 }
+    lignesChantier.forEach(t => {
+        const texteLigne = `- [${t.Support || '?'}] (${t.type || '?'}) ${t.Tache} : ${estFait(t) ? 'Terminé' : (t.etat || 'À faire')}`;
+        if (y > 280) {
+            doc.addPage();
+            y = 20;
+        }
+        doc.text(texteLigne, 14, y);
+        y += 6;
     });
 
     const pdfBlob = doc.output('blob');
