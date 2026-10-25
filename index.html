@@ -3226,16 +3226,14 @@ function rafraichirAffichageTaches() {
             checkbox.className =
                 'w-6 h-6 text-blue-600 rounded cursor-pointer shrink-0';
 
-            checkbox.addEventListener(
-                'change',
-                () => {
-
-                    cocherTache(
-                        rowId,
-                        checkbox
-                    );
-                }
-            );
+checkbox.addEventListener('change', () => {
+    if (checkbox.checked) {
+        checkbox.checked = false;
+        verifierEtOuvrirSousTravaux(rowId);
+    } else {
+        cocherTache(rowId, checkbox);
+    }
+});
 
 
             /* TITRE */
@@ -3251,7 +3249,7 @@ function rafraichirAffichageTaches() {
             titre.innerText =
                 item.Tache || '';
             titre.style.cursor = 'pointer';
-            titre.addEventListener('click', () => ouvrirEtatTache(rowId));
+           titre.addEventListener('click', () => verifierEtOuvrirSousTravaux(rowId));
 
 
             if (item.isCustom) {
@@ -6430,6 +6428,108 @@ document.addEventListener('visibilitychange', async () => {
     await verifierEtSynchroniserFileAttente();
     await chargerDonneesSupabase();
 });;
+
+<!-- ========================================================= -->
+<!-- MODALE DE SÉLECTION DES SOUS-TRAVAUX / MONTAGE -->
+<!-- ========================================================= -->
+<div id="divSousTravauxModal" class="app-modal fixed inset-0 bg-black bg-opacity-60 items-center justify-center z-[1550] p-4">
+    <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col">
+        <p class="font-bold text-lg mb-1 text-gray-800 text-center">⚙️ Sélection des montages / sous-tâches</p>
+        <p id="sousTravauxSousTitre" class="text-xs text-gray-500 mb-4 text-center"></p>
+        
+        <!-- Liste dynamique des sous-tâches -->
+        <div id="containerListSousTravaux" class="space-y-2 mb-4 overflow-y-auto flex-1 border p-3 rounded-lg bg-gray-50 text-sm">
+            <!-- Injecté dynamiquement par JavaScript -->
+        </div>
+
+        <div class="flex gap-2">
+            <button type="button" onclick="validerSousTravauxModal()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white p-2.5 rounded-lg font-bold text-sm">✅ Valider et Fermer</button>
+            <button type="button" onclick="fermerModal('divSousTravauxModal')" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 p-2.5 rounded-lg font-bold text-sm">❌ Annuler</button>
+        </div>
+    </div>
+</div>
+	let sousTravauxIdEnCours = null;
+
+// Fonction déclenchée au clic sur une tâche pour intercepter et voir s'il y a des sous-tâches
+async function verifierEtOuvrirSousTravaux(id) {
+    const item = trouverLigneParId(id);
+    if (!item) return;
+
+    if (!estEnLigne) {
+        // Hors-ligne, on passe direct à l'état classique
+        ouvrirEtatTache(id);
+        return;
+    }
+
+    try {
+        // On interroge la table "sous_travaux_modele" (adaptez le nom du filtre si besoin, ex: .eq('tache', item.Tache))
+        const { data: modeles, error } = await supabaseClient
+            .from('sous_travaux_modele')
+            .select('*')
+            .eq('tache', item.Tache);
+
+        if (!error && modeles && modeles.length > 0) {
+            // 🛑 Il y a des sous-tâches / modèles associés ! On ouvre la modale dédiée
+            sousTravauxIdEnCours = id;
+            document.getElementById('sousTravauxSousTitre').innerText = `${item.Support || ''} — ${item.Tache || ''}`;
+            
+            const container = document.getElementById('containerListSousTravaux');
+            container.innerHTML = '';
+
+            modeles.forEach((m, index) => {
+                // Supposons que votre table possède une colonne "libelle" ou "sous_tache" pour le nom
+                const nomSousTache = m.libelle || m.sous_tache || m.nom || `Option ${index + 1}`;
+                
+                const label = document.createElement('label');
+                label.className = 'flex items-center gap-3 p-2 bg-white rounded border border-gray-200 hover:bg-blue-50 cursor-pointer shadow-sm';
+                label.innerHTML = `
+                    <input type="checkbox" name="choixSousTache" value="${escHtml(nomSousTache)}" class="w-5 h-5 text-blue-600 rounded">
+                    <span class="text-sm font-medium text-gray-700">${escHtml(nomSousTache)}</span>
+                `;
+                container.appendChild(label);
+            });
+
+            ouvrirModal('divSousTravauxModal');
+            return;
+        }
+    } catch (e) {
+        logDiag("Erreur lors de la récupération des sous-travaux : " + e.message);
+    }
+
+    // Si aucun modèle n'est trouvé, on poursuit vers l'état classique de la tâche
+    ouvrirEtatTache(id);
+}
+
+// Validation de la modale des sous-tâches
+async function validerSousTravauxModal() {
+    const id = sousTravauxIdEnCours;
+    if (!id) return;
+
+    const cochees = [...document.querySelectorAll('input[name="choixSousTache"]:checked')].map(el => el.value);
+
+    fermerModal('divSousTravauxModal');
+
+    if (cochees.length > 0) {
+        const texteSelection = `Montage : ${cochees.join(', ')}`;
+        
+        // On enregistre les sous-tâches choisies directement dans l'observation ou un champ
+        const item = trouverLigneParId(id);
+        const obsActuelle = item.Observation ? item.Observation + ' | ' : '';
+        
+        await modifierLigneMulti(id, {
+            Observation: obsActuelle + texteSelection,
+            Fait: true // Si vous souhaitez que valider les sous-tâches coche automatiquement la tâche principale
+        });
+        
+        afficherToast('✅ Montage enregistré');
+    } else {
+        // Si rien n'est coché, on ouvre l'état classique
+        ouvrirEtatTache(id);
+    }
+    
+    sousTravauxIdEnCours = null;
+}
+	
 </script>
 
 </body>
