@@ -938,7 +938,28 @@
             </div>
         </div>
     </div>
+<!-- ========================================================= -->
+<!-- MODALE DE SÉLECTION PERSONNALISÉE (MODÈLE SOUS-TRAVAUX) -->
+<!-- ========================================================= -->
+<div id="divSelectionModeleModal" class="app-modal fixed inset-0 bg-black bg-opacity-60 items-center justify-center z-[1550] p-4">
+    <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
+        <p class="font-bold text-lg mb-1 text-gray-800 text-center">⚙️ Sélection du Modèle</p>
+        <p id="modeleSousTitre" class="text-xs text-gray-500 mb-3 text-center"></p>
+        
+        <!-- Mettez ici les éléments/options à sélectionner -->
+        <div class="space-y-3 mb-4">
+            <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Choisissez les éléments :</label>
+            <div id="containerOptionsModele" class="space-y-2 max-h-40 overflow-y-auto border p-2 rounded-lg text-sm">
+                <!-- Les options injectées dynamiquement s'afficheront ici -->
+            </div>
+        </div>
 
+        <div class="flex gap-2">
+            <button type="button" onclick="validerSelectionModele()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white p-2.5 rounded-lg font-bold text-sm">✅ Valider & Continuer</button>
+            <button type="button" onclick="fermerSelectionModele()" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 p-2.5 rounded-lg font-bold text-sm">❌ Annuler</button>
+        </div>
+    </div>
+</div>
     <div id="divEtatModal"
          class="app-modal fixed inset-0 bg-black bg-opacity-60 items-center justify-center z-[1500] p-4">
 
@@ -3893,8 +3914,72 @@ function sectionsTache(item) {
     return { mes: tacheExigeMesures(item), brh: tacheExigeBRH(item), qt: tacheExigeQt(item), prov: typePendulage(item) };
 }
 
-function ouvrirEtatTache(id) {
+let selectionModeleIdEnCours = null;
 
+// Interception lors du clic sur une tâche pour vérifier le modèle
+async function ouvrirEtatTache(id) {
+    const item = trouverLigneParId(id);
+    if (!item) return;
+
+    // 1. Vérification dans la table "sous_travaux_modele"
+    if (estEnLigne) {
+        try {
+            // Adaptez le filtre selon la colonne qui fait le lien (ex: 'tache' ou 'nom_tache')
+            const { data: modeleData, error } = await supabaseClient
+                .from('sous_travaux_modele')
+                .select('*')
+                .eq('tache', item.Tache) // ou .eq('libelle', item.Tache) selon votre base
+                .maybeSingle();
+
+            if (!error && modeleData) {
+                // 🛑 La tâche est dans le modèle ! On bloque et on affiche votre sélection personnalisée
+                selectionModeleIdEnCours = id;
+                
+                document.getElementById('modeleSousTitre').innerText = `${item.Support || ''} — ${item.Tache || ''}`;
+                
+                // Remplissez ici dynamiquement les choix de votre modèle (exemple basique)
+                const containerOpts = document.getElementById('containerOptionsModele');
+                containerOpts.innerHTML = `
+                    <label class="flex items-center gap-2"><input type="checkbox" name="optModele" value="Option A" checked> Option A du modèle</label>
+                    <label class="flex items-center gap-2"><input type="checkbox" name="optModele" value="Option B"> Option B du modèle</label>
+                `;
+
+                ouvrirModal('divSelectionModeleModal');
+                return; // On stoppe l'ouverture de l'état classique
+            }
+        } catch (e) {
+            logDiag("Erreur lors de la vérification de sous_travaux_modele : " + e.message);
+        }
+    }
+
+    // 2. Si pas de modèle trouvé (ou hors-ligne), on poursuit le parcours classique vers l'état
+    poursuivreOuvertureEtat(id);
+}
+
+function fermerSelectionModele() {
+    fermerModal('divSelectionModeleModal');
+    selectionModeleIdEnCours = null;
+}
+
+// Fonction appelée quand l'utilisateur valide sa sélection personnalisée
+async function validerSelectionModele() {
+    const id = selectionModeleIdEnCours;
+    if (!id) return;
+
+    // Récupérer les éléments cochés/sélectionnés dans la modale
+    const optionsCochees = [...document.querySelectorAll('input[name="optModele"]:checked')].map(el => el.value);
+    
+    // (Optionnel) Vous pouvez sauvegarder ces options dans un champ de la ligne si besoin, ex:
+    // await modifierLigne(id, 'options_modele', optionsCochees.join(', '));
+
+    fermerSelectionModele();
+
+    // Une fois la sélection validée, on enchaîne sur l'état d'avancement classique !
+    poursuivreOuvertureEtat(id);
+}
+
+// Votre ancienne logique d'ouverture d'état isolée ici
+function poursuivreOuvertureEtat(id) {
     const item = trouverLigneParId(id);
     if (!item) return;
 
