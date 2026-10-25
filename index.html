@@ -13,6 +13,7 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <style>
@@ -71,7 +72,7 @@
     <!-- SIDEBAR DROITE -->
     <div id="menuSupportsDroit" class="sidebar-right">
         <button type="button" class="btn-fermer-droit" onclick="basculerMenuSupportsDroit()">&times;</button>
-        <button type="button" onclick="afficherPopupDiagnostic()" style="position:fixed;bottom:8px;right:8px;z-index:3000;background:#dc2626;color:#fff;padding:8px 12px;border-radius:8px;font-size:12px;">Logs</button>
+        <button type="button" onclick="afficherPopupDiagnostic()" style="position:fixed;bottom:60px;right:8px;z-index:3000;background:#dc2626;color:#fff;padding:8px 12px;border-radius:8px;font-size:12px;">Logs</button>
         <div style="padding:15px 20px;">
             <h3 style="color:#fff;margin-top:0;font-size:1.1em;border-bottom:1px solid #333;padding-bottom:8px;">📍 Liste des Supports</h3>
             <div style="margin-bottom:12px;">
@@ -114,6 +115,7 @@
         <div id="page1">
             <div id="headerInfo" class="text-sm text-blue-700 mb-4 font-semibold bg-blue-50 p-2.5 rounded-lg border border-blue-100 flex justify-between items-center">
                 <span>👤 SUTX</span>
+                <button type="button" id="badgeAttente" onclick="forcerSynchro()" class="hidden text-xs bg-amber-100 border border-amber-300 px-2 py-1 rounded text-amber-800 font-bold ml-auto mr-2">⏳ 0 en attente</button>
                 <button type="button" onclick="changerUtilisateur()" class="text-xs bg-white border border-blue-200 px-2 py-1 rounded text-blue-600 hover:bg-blue-100 transition">Changer</button>
             </div>
             <div class="grid grid-cols-2 gap-3 mb-3">
@@ -135,7 +137,11 @@
                 <select id="selectChantier"><option value="">Choisir...</option></select>
                 <select id="selectSupport" disabled><option value="">Choisir...</option></select>
             </div>
-            <div id="sectionActionsRapides" class="hidden flex items-center justify-end gap-2 mb-4 bg-gray-50 p-3 rounded-lg border">
+            <div id="sectionActionsRapides" class="hidden flex flex-wrap items-center justify-between gap-2 mb-4 bg-gray-50 p-3 rounded-lg border">
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" onclick="cocherToutSupport(true)" class="bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-1.5 rounded-lg text-xs font-bold transition">✅ Tout cocher</button>
+                    <button type="button" onclick="cocherToutSupport(false)" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-bold transition">❌ Tout décocher</button>
+                </div>
                 <div class="flex items-center gap-2">
                     <span id="badgeProgressionSupport" class="text-xs font-bold bg-blue-600 text-white px-2.5 py-1 rounded-full">0 / 0 (0%)</span>
                 </div>
@@ -223,6 +229,16 @@
                 <button type="button" onclick="validerAjoutTacheManuelle()" class="flex-1 bg-green-600 hover:bg-green-700 text-white p-2 rounded-lg font-bold text-sm">✅ Ajouter</button>
                 <button type="button" onclick="fermerModal('divAjoutTacheModal')" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 p-2 rounded-lg font-bold text-sm">❌ Annuler</button>
             </div>
+        </div>
+    </div>
+
+    <!-- MODALE CHOIX RAPIDE (BRH / QUANTITÉ) -->
+    <div id="divChoixModal" class="app-modal fixed inset-0 bg-black bg-opacity-60 items-center justify-center z-[1450] p-4">
+        <div class="bg-white p-5 rounded-xl shadow-2xl w-full max-w-sm">
+            <p id="choixTitre" class="font-bold text-lg mb-1 text-gray-800 text-center"></p>
+            <p id="choixSousTitre" class="text-xs text-gray-500 mb-4 text-center"></p>
+            <div id="choixBoutons" class="flex flex-wrap gap-2 mb-3"></div>
+            <button type="button" onclick="fermerChoix()" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 p-2.5 rounded-lg font-bold text-sm">❌ Fermer</button>
         </div>
     </div>
 
@@ -338,9 +354,10 @@
     </div>
     
 <script>
-console.log("VERSION v3 chargée");
+const VERSION_APP = "v2.5";
+console.log("VERSION " + VERSION_APP + " chargée");
 
-const APP_NAME = "suivi_sutx_v3";
+const APP_NAME = "suivi_sutx_v2";
 const CACHE_KEY = `cache_${APP_NAME}`;
 const TABLE_SUPABASE = "suivi_sutx_v2";
 const FILE_ATTENTE_KEY = "file_attente_sutx";
@@ -361,7 +378,7 @@ let logsDiagnosticGlobal = [];
 
 let tachesRealiseesSession = JSON.parse(localStorage.getItem('taches_session_sutx') || '[]').map(String);
 
-logDiag("Table utilisée : " + TABLE_SUPABASE);
+logDiag("Version " + VERSION_APP + " — table : " + TABLE_SUPABASE);
 
 const UNITE_HAUTEUR = "m";
 const UNITE_DESAXEMENT = "cm";
@@ -451,7 +468,14 @@ function afficherPopupDiagnostic() {
     ouvrirModal('divPopupDiagnostic');
 }
 
+function oublierIdentite() {
+    // On garde le cache et la file d'attente : les saisies non envoyées ne sont jamais perdues
+    ['nomSutx', 'prenomSutx', 'emailSutx', 'adminSutx', 'taches_session_sutx'].forEach(k => localStorage.removeItem(k));
+}
+
 function viderLocalStorageApp() {
+    const n = lireFile().length;
+    if (n && !confirm(`⚠️ ${n} saisie(s) ne sont PAS encore envoyées au serveur.\nElles seront DÉFINITIVEMENT perdues.\n\nContinuer quand même ?`)) return;
     if (!confirm("Voulez-vous vraiment vider le cache de l'application ?")) return;
     localStorage.removeItem(CACHE_KEY);
     localStorage.removeItem(FILE_ATTENTE_KEY);
@@ -509,29 +533,210 @@ async function chargerToutesLesLignes() {
 }
 
 async function chargerDonneesSupabase() {
-    const modifiesAvant = new Set(rawData.filter(r => r.modifie === true).map(r => String(r.id)));
-    const customAvant = new Set(rawData.filter(r => r.isCustom === true).map(r => String(r.id)));
-    const localesNonSynchro = rawData.filter(r => r._insertionLocale === true);
-
+    if (!rawData.length) chargerDonneesLocalesCache();   // au démarrage : on part du cache local
+    migrerInsertionsLocales();                           // anciennes tâches manuelles jamais envoyées
     try {
         if (estEnLigne) {
+            // 1) on envoie d'abord tout ce qui a été saisi hors-ligne
+            await synchroniserFile();
+            const modifiesAvant = new Set(rawData.filter(r => r.modifie === true).map(r => String(r.id)));
+            const customAvant = new Set(rawData.filter(r => r.isCustom === true).map(r => String(r.id)));
+            // 2) puis on recharge le serveur
             rawData = await chargerToutesLesLignes();
             rawData.forEach(r => {
                 const k = String(r.id);
                 if (modifiesAvant.has(k)) r.modifie = true;
                 if (customAvant.has(k)) r.isCustom = true;
             });
-            rawData.push(...localesNonSynchro);
+            // 3) et on réapplique ce qui n'a pas encore pu partir (rien n'est écrasé)
+            appliquerFileSurDonnees();
             sauvegarderCacheLocal();
         } else {
             chargerDonneesLocalesCache();
         }
     } catch (err) {
+        logDiag("Chargement serveur impossible (" + (err && err.message) + ") → données locales");
         chargerDonneesLocalesCache();
     }
+    majBadgeAttente();
     initialiserSelecteursChantiers();
     rafraichirAffichageTaches();
 }
+
+/* ========================================================= */
+/* FILE D'ATTENTE HORS-LIGNE                                  */
+/* ========================================================= */
+
+let synchroEnCours = false;
+
+function lireFile() {
+    try { return JSON.parse(localStorage.getItem(FILE_ATTENTE_KEY) || '[]'); } catch (e) { return []; }
+}
+
+function ecrireFile(f) {
+    try { localStorage.setItem(FILE_ATTENTE_KEY, JSON.stringify(f)); } catch (e) {}
+    majBadgeAttente();
+}
+
+function estIdLocal(id) { return String(id).startsWith('cust_'); }
+
+function nouvelUid() { return Date.now() + '_' + Math.random().toString(36).slice(2, 7); }
+
+// Ajoute une modification à envoyer plus tard (fusionnée avec une éventuelle modif en attente)
+function mettreEnFileUpdate(id, champs) {
+    const f = lireFile();
+    const sid = String(id);
+    const insertion = f.find(o => o.op === 'insert' && String(o.ligne.id) === sid);
+    if (insertion && !synchroEnCours) {
+        Object.assign(insertion.ligne, champs);   // tâche manuelle pas encore envoyée : on met à jour la ligne à créer
+    } else {
+        const ex = !synchroEnCours && f.find(o => o.op === 'update' && String(o.id) === sid);
+        if (ex) Object.assign(ex.champs, champs);
+        else f.push({ uid: nouvelUid(), op: 'update', id, champs: { ...champs } });
+    }
+    ecrireFile(f);
+}
+
+function mettreEnFileInsert(ligne) {
+    const f = lireFile();
+    f.push({ uid: nouvelUid(), op: 'insert', ligne: { ...ligne } });
+    ecrireFile(f);
+}
+
+// Envoie une modification tout de suite si possible, sinon la met en file d'attente
+async function envoyerOuMettreEnFile(id, champs) {
+    if (estEnLigne && !estIdLocal(id) && lireFile().length === 0) {
+        try {
+            const { error } = await supabaseClient.from(TABLE_SUPABASE).update(champs).eq('id', id);
+            if (!error) return;
+            logDiag("Envoi refusé (" + error.message + ") → mis en attente");
+        } catch (e) {
+            logDiag("Envoi impossible (" + e.message + ") → mis en attente");
+        }
+    }
+    mettreEnFileUpdate(id, champs);
+    if (estEnLigne) synchroniserFile();
+}
+
+const CHAMPS_LOCAUX = ['_insertionLocale', 'modifie'];
+
+async function insererLigneServeur(ligne) {
+    const payload = { ...ligne };
+    CHAMPS_LOCAUX.forEach(k => delete payload[k]);
+    delete payload.id;                                   // l'identifiant est donné par le serveur
+
+    const envoyer = p => supabaseClient.from(TABLE_SUPABASE).insert([p]).select('id').single();
+    let { data, error } = await envoyer(payload);
+
+    if (error && /iscustom/i.test(error.message || '')) {          // colonne isCustom absente de la table
+        delete payload.isCustom;
+        ({ data, error } = await envoyer(payload));
+    }
+    if (error && error.code === '23502' && /"id"/.test(error.message || '')) {   // table sans id automatique
+        ({ data, error } = await envoyer({ ...payload, id: ligne.id }));
+    }
+    if (error) throw error;
+    return data.id;
+}
+
+// Une tâche manuelle vient d'être créée sur le serveur : on remplace son id provisoire partout
+function remplacerIdLocal(ancien, nouveau) {
+    const a = String(ancien);
+    const ligne = rawData.find(r => String(r.id) === a);
+    if (ligne) { ligne.id = nouveau; delete ligne._insertionLocale; }
+    if (tachesRealiseesSession.includes(a)) {
+        tachesRealiseesSession = tachesRealiseesSession.map(x => x === a ? String(nouveau) : x);
+        localStorage.setItem('taches_session_sutx', JSON.stringify(tachesRealiseesSession));
+    }
+    const f = lireFile();
+    f.forEach(o => { if (o.op === 'update' && String(o.id) === a) o.id = nouveau; });
+    ecrireFile(f);
+    sauvegarderCacheLocal();
+}
+
+async function synchroniserFile() {
+    if (synchroEnCours || !estEnLigne) return;
+    const aEnvoyer = lireFile();
+    if (!aEnvoyer.length) return;
+
+    synchroEnCours = true;
+    const envoyes = new Set();
+    try {
+    for (const op of aEnvoyer) {
+        try {
+            if (op.op === 'insert') {
+                const idServeur = await insererLigneServeur(op.ligne);
+                remplacerIdLocal(op.ligne.id, idServeur);
+            } else {
+                const id = trouverOpCourante(op.uid)?.id ?? op.id;   // id éventuellement remplacé entre-temps
+                if (estIdLocal(id)) continue;                         // attend la création de sa tâche
+                const { error } = await supabaseClient.from(TABLE_SUPABASE).update(op.champs).eq('id', id);
+                if (error) throw error;
+            }
+            envoyes.add(op.uid);
+        } catch (e) {
+            logDiag("Synchro en échec (" + op.op + ") : " + (e && e.message));
+        }
+    }
+    } finally {
+        // on retire seulement ce qui est parti (les saisies faites pendant l'envoi sont conservées)
+        ecrireFile(lireFile().filter(o => !envoyes.has(o.uid)));
+        synchroEnCours = false;
+    }
+
+    const restant = lireFile().length;
+    logDiag(`Synchro : ${envoyes.size} envoyée(s), ${restant} en attente`);
+    if (envoyes.size && !restant) afficherToast('☁️ Saisies synchronisées');
+}
+
+function trouverOpCourante(uid) { return lireFile().find(o => o.uid === uid); }
+
+// Après rechargement serveur : on remet par-dessus ce qui n'est pas encore parti
+function appliquerFileSurDonnees() {
+    lireFile().forEach(op => {
+        if (op.op === 'insert') {
+            if (!trouverLigneParId(op.ligne.id)) rawData.push({ ...op.ligne, _insertionLocale: true, isCustom: true });
+        } else {
+            const r = trouverLigneParId(op.id);
+            if (r) { Object.assign(r, op.champs); r.modifie = true; }
+        }
+    });
+}
+
+// Tâches manuelles créées avec l'ancienne version et restées seulement sur le téléphone
+function migrerInsertionsLocales() {
+    const f = lireFile();
+    const dejaEnFile = new Set(f.filter(o => o.op === 'insert').map(o => String(o.ligne.id)));
+    const aMigrer = rawData.filter(r => r._insertionLocale === true && !dejaEnFile.has(String(r.id)));
+    if (!aMigrer.length) return;
+    aMigrer.forEach(r => f.push({ uid: nouvelUid(), op: 'insert', ligne: { ...r } }));
+    ecrireFile(f);
+    logDiag(`${aMigrer.length} tâche(s) manuelle(s) locale(s) remise(s) en file d'envoi`);
+}
+
+function majBadgeAttente() {
+    const b = document.getElementById('badgeAttente');
+    if (!b) return;
+    const n = lireFile().length;
+    b.classList.toggle('hidden', n === 0);
+    b.textContent = `⏳ ${n} en attente`;
+}
+
+async function forcerSynchro() {
+    if (!navigator.onLine) { alert("⚠️ Pas de réseau : les saisies partiront automatiquement au retour de la connexion."); return; }
+    estEnLigne = true;
+    await chargerDonneesSupabase();
+    const n = lireFile().length;
+    if (n) alert(`⚠️ ${n} saisie(s) toujours en attente. Détail dans les Logs.`);
+}
+
+// Nouvel essai régulier (réseau instable sur le terrain)
+setInterval(() => {
+    if (navigator.onLine && lireFile().length && !synchroEnCours) {
+        estEnLigne = true;
+        synchroniserFile();
+    }
+}, 60000);
 
 function chargerDonneesLocalesCache() {
     const cache = localStorage.getItem(CACHE_KEY);
@@ -560,7 +765,7 @@ function initialiserSelecteursChantiers() {
 
 window.addEventListener('DOMContentLoaded', () => {
     try {
-        if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+        if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').then(reg => reg.update()).catch(() => {});
     } catch (e) {}
     mettreAJourBandeauReseau();
     if (userEmail && userName) {
@@ -831,8 +1036,9 @@ async function verifierAccesEtLancer() {
     }
     try {
         const { data:userRecord, error } = await supabaseClient.from('app_bob').select('*').eq('email', userEmail).maybeSingle();
-        if (error || !userRecord || userRecord.sutx !== true) {
-            localStorage.clear();
+        if (error) throw error;   // souci réseau : on ne déconnecte pas l'agent
+        if (!userRecord || userRecord.sutx !== true) {
+            oublierIdentite();
             document.getElementById('auth-overlay').classList.remove('hidden');
             return;
         }
@@ -847,15 +1053,17 @@ async function verifierAccesEtLancer() {
 function lancerApplication() {
     document.getElementById('auth-overlay').classList.add('hidden');
     document.getElementById('main-app').classList.remove('hidden');
-    document.getElementById('headerInfo').querySelector('span').innerText = `👤 SUTX : ${userPrenom} ${userName}`;
+    document.getElementById('headerInfo').querySelector('span').innerText = `👤 SUTX : ${userPrenom} ${userName} · ${VERSION_APP}`;
     document.getElementById('btnMenuAdmin').style.display = userAdmin ? 'block' : 'none';
     document.getElementById('barreOnglets').classList.toggle('hidden', !userAdmin);
     chargerDonneesSupabase();
 }
 
 function changerUtilisateur() {
-    if (confirm("Voulez-vous changer d'utilisateur ?")) {
-        localStorage.clear();
+    const n = lireFile().length;
+    const msg = n ? `Voulez-vous changer d'utilisateur ?\n\n${n} saisie(s) en attente seront conservées et envoyées au retour du réseau.` : "Voulez-vous changer d'utilisateur ?";
+    if (confirm(msg)) {
+        oublierIdentite();
         location.reload();
     }
 }
@@ -1146,6 +1354,7 @@ function ouvrirModalAjoutTache() {
     const selectTache = document.getElementById('selectTacheExistante');
     selectTache.innerHTML = '<option value="">-- Choisir une tâche existante ou saisir ci-dessous --</option>';
     
+    // Récupérer la liste sans doublons de toutes les tâches de toute la table
     const tachesUniques = [...new Set(rawData.map(r => r.Tache).filter(Boolean))].sort((a, b) => a.localeCompare(b));
     tachesUniques.forEach(t => {
         selectTache.add(new Option(t, t));
@@ -1160,6 +1369,7 @@ function choisirTacheExistante() {
     const val = document.getElementById('selectTacheExistante').value;
     if (val) {
         document.getElementById('inputNouvelleTache').value = val;
+        // Retrouver le type associé si possible
         const trouve = rawData.find(r => r.Tache === val);
         if (trouve && trouve.type) {
             document.getElementById('selectTypeNouvelleTache').value = cleChapitre(trouve);
@@ -1192,6 +1402,7 @@ async function validerAjoutTacheManuelle() {
         Tache: intitule,
         Fait: true,
         etat: 'TERMINE',
+        date_fait: dateDuPoste(),
         isCustom: true,
         _insertionLocale: true,
         nom: userName,
@@ -1210,13 +1421,8 @@ async function validerAjoutTacheManuelle() {
     rafraichirAffichageTaches();
     afficherToast('✅ Tâche non prévue ajoutée');
 
-    if (estEnLigne) {
-        try {
-            await supabaseClient.from(TABLE_SUPABASE).insert([nouvelleLigne]);
-        } catch (e) {
-            logDiag("Erreur synchro insert custom : " + e.message);
-        }
-    }
+    mettreEnFileInsert(nouvelleLigne);
+    if (estEnLigne) synchroniserFile();
 }
 
 /* ========================================================= */
@@ -1343,11 +1549,95 @@ async function validerChoix(i) {
     const val = options[i].val;
     fermerChoix();
 
+    const fait = type === 'brh' ? true : val >= qtMax(item);
     if (type === 'brh') {
         await modifierLigneMulti(id, { brh: val, Fait: true });
     } else {
-        await modifierLigneMulti(id, { qt_realisee: val, Fait: val >= qtMax(item) });
+        await modifierLigneMulti(id, { qt_realisee: val, Fait: fait });
     }
+    if (fait) ajouterASession(id);
+    afficherToast('✅ Enregistré');
+}
+
+/* ========================================================= */
+/* TOUT COCHER / TOUT DÉCOCHER (support affiché)             */
+/* ========================================================= */
+
+function ajouterASession(id) {
+    const s = String(id);
+    if (!tachesRealiseesSession.includes(s)) {
+        tachesRealiseesSession.push(s);
+        localStorage.setItem('taches_session_sutx', JSON.stringify(tachesRealiseesSession));
+    }
+}
+
+function retirerDeSession(id) {
+    const s = String(id);
+    tachesRealiseesSession = tachesRealiseesSession.filter(x => x !== s);
+    localStorage.setItem('taches_session_sutx', JSON.stringify(tachesRealiseesSession));
+}
+
+// Tâches visibles à l'écran (même filtres que l'affichage)
+function tachesAffichees() {
+    const chantier = selectChantier.value;
+    const support = selectSupport.value;
+    const filtre = (document.getElementById('filtreTachesInput').value || '').toLowerCase();
+    return rawData.filter(r => r.Chantier === chantier && r.Support === support
+        && typeVisibleFiltre(r)
+        && !tacheVerrouilleeFBM(r)
+        && (!filtre || String(r.Tache || '').toLowerCase().includes(filtre)));
+}
+
+async function cocherToutSupport(cocher) {
+    if (!selectSupport.value) { alert("ℹ️ Choisis d'abord un support."); return; }
+    const lignes = tachesAffichees();
+    let cibles;
+
+    if (cocher) {
+        const aFaire = lignes.filter(r => !estFait(r));
+        // Les tâches avec saisie obligatoire (mesures, BRH, quantité) restent à valider une par une
+        cibles = aFaire.filter(r => !tacheExigeMesures(r) && !tacheExigeBRH(r) && !tacheExigeQt(r));
+        const ignorees = aFaire.length - cibles.length;
+        if (!cibles.length) {
+            alert(ignorees
+                ? `ℹ️ Les ${ignorees} tâche(s) restante(s) demandent une saisie (mesures, BRH ou quantité) : valide-les une par une.`
+                : 'ℹ️ Tout est déjà coché.');
+            return;
+        }
+        if (!confirm(`Marquer ${cibles.length} tâche(s) comme TERMINÉES ?`
+            + (ignorees ? `\n\n${ignorees} tâche(s) avec saisie obligatoire resteront à faire.` : ''))) return;
+    } else {
+        cibles = lignes.filter(estFait);
+        if (!cibles.length) { alert('ℹ️ Aucune tâche cochée sur ce support.'); return; }
+        if (!confirm(`Décocher ${cibles.length} tâche(s) ?`)) return;
+    }
+
+    const maj = cocher
+        ? { Fait: true, etat: 'TERMINE', date_fait: dateDuPoste(), nom: userName, prenom: userPrenom }
+        : { Fait: false, etat: null, date_fait: null, nom: userName, prenom: userPrenom };
+
+    cibles.forEach(r => {
+        Object.assign(r, maj);
+        r.modifie = true;
+        if (cocher) ajouterASession(r.id); else retirerDeSession(r.id);
+    });
+    sauvegarderCacheLocal();
+    rafraichirAffichageTaches();
+    afficherToast(cocher ? `✅ ${cibles.length} tâche(s) cochée(s)` : `❌ ${cibles.length} tâche(s) décochée(s)`);
+
+    // Une seule requête pour tout le lot si possible, sinon file d'attente
+    const ids = cibles.filter(r => !estIdLocal(r.id)).map(r => r.id);
+    if (estEnLigne && ids.length === cibles.length && lireFile().length === 0) {
+        try {
+            const { error } = await supabaseClient.from(TABLE_SUPABASE).update(maj).in('id', ids);
+            if (!error) return;
+            logDiag('Envoi tout cocher refusé (' + error.message + ') → mis en attente');
+        } catch (e) {
+            logDiag('Envoi tout cocher impossible (' + e.message + ') → mis en attente');
+        }
+    }
+    cibles.forEach(r => mettreEnFileUpdate(r.id, maj));
+    if (estEnLigne) synchroniserFile();
 }
 
 function ouvrirInfoTache(id) {
@@ -1367,7 +1657,7 @@ function fermerInfoTache() {
     fermerModal('divInfoModal');
     const item = trouverLigneParId(id);
     if (item && valeur !== String(item.Observation || '').trim()) {
-        modifierLigne(id, 'Observation', valeur);
+        modifierLigneMulti(id, { Observation: valeur });
     }
 }
 
@@ -1544,11 +1834,7 @@ async function modifierLigneMulti(id, champs) {
     sauvegarderCacheLocal();
     rafraichirAffichageTaches();
 
-    if (estEnLigne) {
-        try {
-            await supabaseClient.from(TABLE_SUPABASE).update(updateData).eq('id', id);
-        } catch (e) {}
-    }
+    await envoyerOuMettreEnFile(id, updateData);
 }
 
 function sauvegarderCacheLocal() {
@@ -1587,10 +1873,8 @@ function actionCopierDepuisMenu() {
     });
 
     navigator.clipboard.writeText(texte).then(() => {
+        // La copie ne vide PLUS la session : seul "Partager PDF & Reset" la remet à zéro
         alert("✅ Récapitulatif de la session copié dans le presse-papier !");
-        tachesRealiseesSession = [];
-        localStorage.removeItem('taches_session_sutx');
-        rafraichirAffichageTaches();
     }).catch(err => {
         alert("❌ Erreur lors de la copie : " + err);
     });
@@ -1601,128 +1885,150 @@ function actionPartagerPDFDepuisMenu() {
     genererEtPartagerPDFSession();
 }
 
-function genererEtPartagerPDFSession() {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    const chantier = selectChantier.value || 'Général';
-    
-    const lignesSession = rawData.filter(r => tachesRealiseesSession.includes(String(r.id)));
+function viderSessionTaches() {
+    tachesRealiseesSession = [];
+    localStorage.removeItem('taches_session_sutx');
+    rafraichirAffichageTaches();
+}
 
-    if (lignesSession.length === 0) {
-        alert("ℹ️ Aucune tâche réalisée dans cette session à exporter en PDF.");
-        return;
+function nomFichierPropre(t) {
+    return String(t || 'General').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9_-]+/g, '_');
+}
+
+function creerDocPDF() {
+    if (!window.jspdf || !window.jspdf.jsPDF) {
+        throw new Error("Librairie PDF non chargée (pas de réseau au démarrage ?). Recharge la page avec du réseau.");
+    }
+    const doc = new window.jspdf.jsPDF();
+    if (typeof doc.autoTable !== 'function') {
+        throw new Error("Module tableau PDF (autotable) non chargé. Recharge la page avec du réseau.");
+    }
+    return doc;
+}
+
+// Partage le PDF ; si le partage échoue (hors annulation), bascule sur le téléchargement.
+// Retourne 'partage', 'telecharge' ou 'annule'.
+// Téléphone / tablette (Android, iPhone, iPad) → fenêtre de partage ; PC → téléchargement direct
+function estMobile() {
+    const ua = navigator.userAgent || '';
+    return /Android|iPhone|iPad|iPod/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+}
+
+async function livrerPDF(doc, nomFichier, titre, texte) {
+    if (!estMobile()) {
+        // Sur PC, la fenêtre de partage Windows/Mac n'est pas pratique : on télécharge le fichier
+        doc.save(nomFichier);
+        logDiag("PC : PDF téléchargé → " + nomFichier);
+        return 'telecharge';
     }
 
-    let texteCorps = `📋 Rapport de Session - SUTX\nChantier : ${chantier}\nDate : ${new Date().toLocaleDateString()}\nOpérateur : ${userName} ${userPrenom}\n\n`;
-    
-    const parSupport = {};
-    lignesSession.forEach(r => {
-        (parSupport[r.Support] = parSupport[r.Support] || []).push(r);
-    });
+    const fichier = new File([doc.output('blob')], nomFichier, { type: 'application/pdf' });
 
-    Object.keys(parSupport).forEach(support => {
-        texteCorps += `--- SUPPORT : ${support} ---\n`;
-        parSupport[support].forEach(t => {
-            texteCorps += `* [${t.type || 'tâche'}] ${t.Tache} -> ${t.etat || 'TERMINE'}\n`;
-            if (t.Observation) texteCorps += `  Obs: ${t.Observation}\n`;
-        });
-        texteCorps += `\n`;
-    });
-
-    // Génération PDF native 100% fiable sans dépendance externe de tableau
-    doc.setFont("Helvetica", "bold");
-    doc.setFontSize(16);
-    doc.setTextColor(37, 99, 235);
-    doc.text(`Rapport de Session - SUTX`, 14, 20);
-    
-    doc.setFont("Helvetica", "normal");
-    doc.setFontSize(10);
-    doc.setTextColor(100, 100, 100);
-    doc.text(`Chantier : ${chantier} | Date : ${new Date().toLocaleDateString()} | Opérateur : ${userName} ${userPrenom}`, 14, 28);
-
-    doc.setDrawColor(200, 200, 200);
-    doc.line(14, 32, 196, 32);
-
-    let y = 40;
-    doc.setFontSize(10);
-    doc.setTextColor(50, 50, 50);
-
-    const lignesTextePDF = doc.splitTextToSize(texteCorps, 180);
-    lignesTextePDF.forEach(ligne => {
-        if (y > 280) {
-            doc.addPage();
-            y = 20;
+    if (navigator.canShare && navigator.canShare({ files: [fichier] })) {
+        try {
+            await navigator.share({ files: [fichier], title: titre, text: texte });
+            logDiag("PDF partagé : " + nomFichier);
+            return 'partage';
+        } catch (e) {
+            if (e && e.name === 'AbortError') {
+                logDiag("Partage annulé par l'utilisateur");
+                return 'annule';
+            }
+            logDiag("Échec partage (" + (e && e.name) + ") : " + (e && e.message) + " → téléchargement");
         }
-        doc.text(ligne, 14, y);
-        y += 6;
-    });
-
-    const pdfBlob = doc.output('blob');
-    const nomFichier = `Rapport_Session_${chantier}_${new Date().toISOString().slice(0,10)}.pdf`;
-
-    if (navigator.canShare && navigator.canShare({ files: [new File([pdfBlob], nomFichier, { type: 'application/pdf' })] })) {
-        navigator.share({
-            files: [new File([pdfBlob], nomFichier, { type: 'application/pdf' })],
-            title: 'Rapport de Session SUTX',
-            text: texteCorps
-        }).then(() => {
-            tachesRealiseesSession = [];
-            localStorage.removeItem('taches_session_sutx');
-            rafraichirAffichageTaches();
-        }).catch(() => {});
     } else {
-        doc.save(nomFichier);
-        navigator.clipboard.writeText(texteCorps).catch(() => {});
-        alert("📄 PDF téléchargé et récapitulatif copié !");
-        tachesRealiseesSession = [];
-        localStorage.removeItem('taches_session_sutx');
-        rafraichirAffichageTaches();
+        logDiag("Partage de fichiers non supporté ici → téléchargement");
+    }
+
+    doc.save(nomFichier);
+    return 'telecharge';
+}
+
+async function genererEtPartagerPDFSession() {
+    try {
+        const chantier = selectChantier.value || 'Général';
+        const lignesSession = rawData.filter(r => tachesRealiseesSession.includes(String(r.id)));
+
+        if (lignesSession.length === 0) {
+            alert("ℹ️ Aucune tâche validée dans cette session.\n\nSeules les tâches enregistrées via la fenêtre « État d'avancement » depuis le dernier partage PDF sont incluses.");
+            return;
+        }
+
+        const doc = creerDocPDF();
+
+        doc.setFontSize(16);
+        doc.setTextColor(37, 99, 235);
+        doc.text(`Rapport de Session - SUTX`, 14, 20);
+
+        doc.setFontSize(11);
+        doc.setTextColor(100, 100, 100);
+        doc.text(`Chantier : ${chantier} | Date : ${new Date().toLocaleDateString()} | Opérateur : ${userName} ${userPrenom}`, 14, 28);
+
+        const dataTable = lignesSession.map(t => [
+            t.Support || '',
+            t.type || '',
+            t.Tache || '',
+            t.etat || 'TERMINE',
+            t.Observation || ''
+        ]);
+
+        doc.autoTable({
+            startY: 35,
+            head: [['Support', 'Chapitre', 'Tâche', 'État', 'Observation']],
+            body: dataTable,
+            theme: 'grid',
+            headStyles: { fillColor: [37, 99, 235] },
+            styles: { fontSize: 9 }
+        });
+
+        const nomFichier = `Rapport_Session_${nomFichierPropre(chantier)}_${new Date().toISOString().slice(0,10)}.pdf`;
+        const resultat = await livrerPDF(doc, nomFichier, 'Rapport de Session SUTX', `Rapport pour le chantier ${chantier}`);
+
+        if (resultat === 'annule') return; // on garde la session pour pouvoir relancer
+        viderSessionTaches();
+        afficherToast(resultat === 'partage' ? '✅ PDF partagé' : '📄 PDF téléchargé (dossier Téléchargements)');
+    } catch (e) {
+        logDiag("Erreur PDF session : " + e.message);
+        alert("❌ Erreur PDF : " + e.message);
     }
 }
 
-function partagerPDFAvancement() {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    const chantier = selectChantier.value || 'Général';
-    
-    const lignesChantier = rawData.filter(r => r.Chantier === chantier);
-    if (lignesChantier.length === 0) {
-        alert("ℹ️ Aucune donnée pour ce chantier.");
-        return;
-    }
-
-    doc.setFont("Helvetica", "bold");
-    doc.setFontSize(16);
-    doc.setTextColor(37, 99, 235);
-    doc.text(`Avancement Global - ${chantier}`, 14, 20);
-
-    let y = 30;
-    doc.setFont("Helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(50, 50, 50);
-
-    lignesChantier.forEach(t => {
-        const texteLigne = `- [${t.Support || '?'}] (${t.type || '?'}) ${t.Tache} : ${estFait(t) ? 'Terminé' : (t.etat || 'À faire')}`;
-        if (y > 280) {
-            doc.addPage();
-            y = 20;
+async function partagerPDFAvancement() {
+    try {
+        const chantier = selectChantier.value || 'Général';
+        const lignesChantier = rawData.filter(r => r.Chantier === chantier);
+        if (lignesChantier.length === 0) {
+            alert("ℹ️ Aucune donnée pour ce chantier.");
+            return;
         }
-        doc.text(texteLigne, 14, y);
-        y += 6;
-    });
 
-    const pdfBlob = doc.output('blob');
-    const nomFichier = `Avancement_${chantier}.pdf`;
+        const doc = creerDocPDF();
 
-    if (navigator.canShare && navigator.canShare({ files: [new File([pdfBlob], nomFichier, { type: 'application/pdf' })] })) {
-        navigator.share({
-            files: [new File([pdfBlob], nomFichier, { type: 'application/pdf' })],
-            title: 'Avancement Chantier SUTX',
-            text: `Avancement du chantier ${chantier}`
-        }).catch(() => {});
-    } else {
-        doc.save(nomFichier);
-        alert("📄 PDF d'avancement téléchargé !");
+        doc.setFontSize(16);
+        doc.setTextColor(37, 99, 235);
+        doc.text(`Avancement Global - ${chantier}`, 14, 20);
+
+        const dataTable = lignesChantier.map(t => [
+            t.Support || '',
+            t.type || '',
+            t.Tache || '',
+            estFait(t) ? 'Terminé' : (t.etat || 'À faire')
+        ]);
+
+        doc.autoTable({
+            startY: 28,
+            head: [['Support', 'Chapitre', 'Tâche', 'État']],
+            body: dataTable,
+            theme: 'grid',
+            headStyles: { fillColor: [37, 99, 235] },
+            styles: { fontSize: 9 }
+        });
+
+        const resultat = await livrerPDF(doc, `Avancement_${nomFichierPropre(chantier)}.pdf`, 'Avancement Chantier SUTX', `Avancement du chantier ${chantier}`);
+        if (resultat === 'telecharge') afficherToast("📄 PDF d'avancement téléchargé");
+    } catch (e) {
+        logDiag("Erreur PDF avancement : " + e.message);
+        alert("❌ Erreur PDF : " + e.message);
     }
 }
 
