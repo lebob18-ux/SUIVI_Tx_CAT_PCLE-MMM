@@ -1235,46 +1235,7 @@ function rafraichirAffichageTaches() {
 let sousTravauxIdEnCours = null;
 
 async function verifierEtOuvrirSousTravaux(id) {
-    const item = trouverLigneParId(id);
-    if (!item) return;
-
-    if (!estEnLigne) {
-        ouvrirEtatTache(id);
-        return;
-    }
-
-    try {
-        const { data: modeles, error } = await supabaseClient
-            .from('sous_travaux_modele')
-            .select('*')
-            .eq('tache', item.Tache);
-
-        if (!error && modeles && modeles.length > 0) {
-            sousTravauxIdEnCours = id;
-            document.getElementById('sousTravauxSousTitre').innerText = `${item.Support || ''} — ${item.Tache || ''}`;
-            
-            const container = document.getElementById('containerListSousTravaux');
-            container.innerHTML = '';
-
-            modeles.forEach((m, index) => {
-                const nomSousTache = m.libelle || m.sous_tache || m.nom || `Option ${index + 1}`;
-                
-                const label = document.createElement('label');
-                label.className = 'flex items-center gap-3 p-2 bg-white rounded border border-gray-200 hover:bg-blue-50 cursor-pointer shadow-sm';
-                label.innerHTML = `
-                    <input type="checkbox" name="choixSousTache" value="${escHtml(nomSousTache)}" class="w-5 h-5 text-blue-600 rounded">
-                    <span class="text-sm font-medium text-gray-700">${escHtml(nomSousTache)}</span>
-                `;
-                container.appendChild(label);
-            });
-
-            ouvrirModal('divSousTravauxModal');
-            return;
-        }
-    } catch (e) {
-        logDiag("Erreur lors de la récupération des sous-travaux : " + e.message);
-    }
-
+    // On ouvre directement la modale d'état complète pour TOUTES les tâches
     ouvrirEtatTache(id);
 }
 
@@ -1490,6 +1451,71 @@ function poursuivreOuvertureEtat(id) {
 let etatIdEnCours = null;
 let etatChoisi = null;
 
+
+function $id(id) { return document.getElementById(id); }
+
+function sectionsTache(item) {
+    const rel = typeReleve(item);
+    const axe = typeAxe(item);
+    const mes = tacheExigeMesures(item);
+    const brh = tacheExigeBRH(item);
+    const qt = tacheExigeQt(item);
+    return { mes, brh, qt, prov: false };
+}
+
+function choisirEtat(etat, silencieux = false) {
+    etatChoisi = etat;
+    const isTermine = (etat === 'TERMINE');
+    const isEnCours = (etat === 'EN_COURS');
+
+    $id('btnEtatEC').className = `flex-1 py-2 rounded-lg text-sm font-bold ${isEnCours ? 'bg-amber-500 text-white shadow' : 'bg-gray-200 text-gray-700'}`;
+    $id('btnEtatTE').className = `flex-1 py-2 rounded-lg text-sm font-bold ${isTermine ? 'bg-green-600 text-white shadow' : 'bg-gray-200 text-gray-700'}`;
+    $id('btnEtatAN').className = `flex-1 py-2 rounded-lg text-sm font-bold ${etat === 'ANNULE' ? 'bg-red-600 text-white shadow' : 'bg-gray-200 text-gray-700'}`;
+
+    $id('etatDetails').classList.remove('hidden');
+
+    const item = trouverLigneParId(etatIdEnCours);
+    const s = sectionsTache(item);
+
+    $id('etatSecMes').classList.toggle('hidden', !(isTermine && s.mes));
+    $id('etatSecBrh').classList.toggle('hidden', !(isTermine && s.brh));
+    $id('etatSecQt').classList.toggle('hidden', !s.qt);
+    $id('etatPctZone').classList.toggle('hidden', !isEnCours);
+    $id('etatSecConf').classList.toggle('hidden', !isTermine);
+}
+
+let etatConforme = true;
+let etatBrh = null;
+
+function choisirConforme(oui) {
+    etatConforme = oui;
+    $id('btnConfOui').className = `flex-1 py-2 rounded-lg text-sm font-bold ${oui ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700'}`;
+    $id('btnConfNon').className = `flex-1 py-2 rounded-lg text-sm font-bold ${!oui ? 'bg-red-600 text-white' : 'bg-gray-200 text-gray-700'}`;
+    $id('etatNcZone').classList.toggle('hidden', oui);
+}
+
+function choisirBrh(oui) {
+    etatBrh = oui;
+    $id('btnBrhOui').className = `flex-1 py-2 rounded-lg text-sm font-bold ${oui ? 'bg-orange-600 text-white' : 'bg-gray-200 text-gray-700'}`;
+    $id('btnBrhNon').className = `flex-1 py-2 rounded-lg text-sm font-bold ${!oui ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-700'}`;
+}
+
+function majEtatUI() {
+    choisirConforme(true);
+    if (etatBrh !== null) {
+        choisirBrh(etatBrh);
+    }
+}
+
+function fermerEtat() {
+    fermerModal('divEtatModal');
+    etatIdEnCours = null;
+    etatChoisi = null;
+}
+
+
+
+    
 async function validerEtat() {
     const id = etatIdEnCours;
     const item = trouverLigneParId(id);
