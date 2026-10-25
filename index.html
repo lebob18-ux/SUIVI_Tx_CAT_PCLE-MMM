@@ -64,8 +64,8 @@
             <div id="sidebarChantiersContainer" style="display:flex;flex-direction:column;gap:6px;"></div>
         </div>
         <div id="footerGauche" class="sidebar-fixed-footer">
-            <button type="button" onclick="actionCopierDepuisMenu()">📋 Copier Récap</button>
-            <button type="button" onclick="actionPartagerPDFDepuisMenu()">📄 Partager PDF</button>
+            <button type="button" onclick="actionCopierDepuisMenu()">📋 Copier Récap (Session)</button>
+            <button type="button" onclick="actionPartagerPDFDepuisMenu()">📄 Partager PDF & Reset</button>
         </div>
     </div>
 
@@ -89,7 +89,7 @@
             <div id="sidebarSupportsContainer" style="display:flex;flex-direction:column;gap:6px;"></div>
         </div>
         <div id="footerDroit" class="sidebar-fixed-footer">
-            <button type="button" onclick="actionPartagerPDFDepuisMenu()">📄 Partager PDF</button>
+            <button type="button" onclick="actionPartagerPDFDepuisMenu()">📄 Partager PDF & Reset</button>
         </div>
     </div>
 
@@ -194,35 +194,6 @@
         </div>
     </div>
 
-    <div id="divRJModal" class="app-modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50 p-4">
-        <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-sm text-center">
-            <p class="font-bold text-lg mb-2 text-gray-800">🌙 Numéro RJ requis</p>
-            <p class="text-xs text-gray-600 mb-4">Veuillez indiquer le numéro RJ pour valider cette action :</p>
-            <input type="text" id="rjInput" placeholder="Numéro RJ" class="w-full p-2 border rounded-lg mb-4 text-center font-bold">
-            <div class="flex gap-2">
-                <button type="button" onclick="executerActionEnAttente()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-lg font-bold text-sm">✅ Valider</button>
-                <button type="button" onclick="fermerModal('divRJModal')" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 p-2 rounded-lg font-bold text-sm">❌ Annuler</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="divAjoutTacheModal" class="app-modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50 p-4">
-        <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-sm">
-            <p class="font-bold text-lg mb-2 text-gray-800 text-center">➕ Travail non prévu ou oublié</p>
-            <p class="text-xs text-gray-600 mb-4 text-center">Enregistré localement et synchronisé dès le retour du réseau.</p>
-            <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Tâche déjà créée sur ce chantier :</label>
-            <select id="selectTacheExistante" onchange="choisirTacheExistante()" class="w-full p-2.5 border rounded-lg mb-3 text-sm bg-white"></select>
-            <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Chapitre :</label>
-            <select id="selectTypeNouvelleTache" class="w-full p-2.5 border rounded-lg mb-3 text-sm bg-white"></select>
-            <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Intitulé (ou saisir une nouvelle tâche) :</label>
-            <input type="text" id="inputNouvelleTache" placeholder="Ex: Reprise fondation spécifique..." class="w-full p-2.5 border rounded-lg mb-4 text-sm">
-            <div class="flex gap-2">
-                <button type="button" onclick="validerAjoutTacheManuelle()" class="flex-1 bg-green-600 hover:bg-green-700 text-white p-2 rounded-lg font-bold text-sm">✅ Ajouter</button>
-                <button type="button" onclick="fermerModal('divAjoutTacheModal')" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 p-2 rounded-lg font-bold text-sm">❌ Annuler</button>
-            </div>
-        </div>
-    </div>
-
     <div id="divNotesModal" class="app-modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50 p-4">
         <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-md">
             <p class="font-bold text-lg mb-2 text-gray-800 text-center">📝 Notes & Consignes de Chantier</p>
@@ -230,6 +201,32 @@
             <div class="flex gap-2">
                 <button type="button" onclick="sauvegarderNotes()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white p-2.5 rounded-lg font-bold text-sm">💾 Enregistrer</button>
                 <button type="button" onclick="fermerModal('divNotesModal')" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 p-2.5 rounded-lg font-bold text-sm">❌ Fermer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODALE AJOUT TÂCHE MANUELLE -->
+    <div id="divAjoutTacheModal" class="app-modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50 p-4">
+        <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-sm">
+            <p class="font-bold text-lg mb-2 text-gray-800 text-center">➕ Travail non prévu ou oublié</p>
+            <p class="text-xs text-gray-600 mb-4 text-center">Enregistré localement et synchronisé dès le retour du réseau.</p>
+            
+            <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Tâche déjà créée sur la table :</label>
+            <select id="selectTacheExistante" onchange="choisirTacheExistante()" class="w-full p-2.5 border rounded-lg mb-3 text-sm bg-white"></select>
+            
+            <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Chapitre :</label>
+            <select id="selectTypeNouvelleTache" class="w-full p-2.5 border rounded-lg mb-3 text-sm bg-white">
+                <option value="pose">🔩 Pose</option>
+                <option value="depose">🔧 Dépose</option>
+                <option value="gc">🧱 GC</option>
+            </select>
+            
+            <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Intitulé (ou saisir une nouvelle tâche) :</label>
+            <input type="text" id="inputNouvelleTache" placeholder="Ex: Reprise fondation spécifique..." class="w-full p-2.5 border rounded-lg mb-4 text-sm">
+            
+            <div class="flex gap-2">
+                <button type="button" onclick="validerAjoutTacheManuelle()" class="flex-1 bg-green-600 hover:bg-green-700 text-white p-2 rounded-lg font-bold text-sm">✅ Ajouter</button>
+                <button type="button" onclick="fermerModal('divAjoutTacheModal')" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 p-2 rounded-lg font-bold text-sm">❌ Annuler</button>
             </div>
         </div>
     </div>
@@ -308,7 +305,6 @@
                     <select id="etatSelQt" class="w-full p-2.5 border rounded-lg text-sm bg-white"></select>
                 </div>
 
-                <!-- Section Pendules Provisoires -->
                 <div id="etatSecProv" class="hidden mb-3 p-3 rounded-lg bg-teal-50 border border-teal-200">
                     <p class="text-xs font-bold uppercase text-teal-800 mb-2">🔧 Pendules provisoires</p>
                     <div class="grid grid-cols-2 gap-2">
@@ -367,6 +363,8 @@ let userAdmin = false;
 let qrStream = null;
 let qrScanInterval = null;
 let logsDiagnosticGlobal = [];
+
+let tachesRealiseesSession = JSON.parse(localStorage.getItem('taches_session_sutx') || '[]').map(String);
 
 logDiag("Table utilisée : " + TABLE_SUPABASE);
 
@@ -452,10 +450,17 @@ function logDiag(message) {
     console.log(`[${timestamp}] ${message}`);
 }
 
+function afficherPopupDiagnostic() {
+    const conteneur = document.getElementById('contenuLogsDiagnostic');
+    if (conteneur) conteneur.innerText = logsDiagnosticGlobal.join('\n');
+    ouvrirModal('divPopupDiagnostic');
+}
+
 function viderLocalStorageApp() {
     if (!confirm("Voulez-vous vraiment vider le cache de l'application ?")) return;
     localStorage.removeItem(CACHE_KEY);
     localStorage.removeItem(FILE_ATTENTE_KEY);
+    localStorage.removeItem('taches_session_sutx');
     location.reload();
 }
 
@@ -546,7 +551,6 @@ function initialiserSelecteursChantiers() {
     const chantiers = [...new Set(rawData.map(r => r.Chantier).filter(Boolean))];
     chantiers.forEach(chantier => selectC.add(new Option(chantier, chantier)));
     
-    // Sélection prioritaire de TEST_BOB si présent au démarrage
     if (!valeurActuelle && chantiers.includes("TEST_BOB")) {
         selectC.value = "TEST_BOB";
     } else if (valeurActuelle && chantiers.includes(valeurActuelle)) {
@@ -869,6 +873,7 @@ function changerOnglet(numPage) {
     const inactif = 'bg-gray-200 text-gray-700';
     document.getElementById('btnOngletSaisie').className = `flex-1 py-2 rounded-lg text-sm font-bold ${numPage === 1 ? actif : inactif}`;
     document.getElementById('btnOngletAdmin').className = `flex-1 py-2 rounded-lg text-sm font-bold ${numPage === 2 ? actif : inactif}`;
+    if (numPage === 2) construireVueAdminHierarchique();
 }
 
 const selectChantier = document.getElementById('selectChantier');
@@ -1034,9 +1039,16 @@ function rafraichirAffichageTaches() {
         checkbox.checked = coche;
         checkbox.className = 'w-6 h-6 text-blue-600 rounded cursor-pointer shrink-0';
 
-        checkbox.addEventListener('change', () => {
-            checkbox.checked = coche;
-            verifierEtOuvrirSousTravaux(rowId);
+        checkbox.addEventListener('change', async (e) => {
+            e.preventDefault();
+            if (coche) {
+                await modifierLigneMulti(rowId, { Fait: false, etat: null });
+                tachesRealiseesSession = tachesRealiseesSession.filter(id => id !== String(rowId));
+                localStorage.setItem('taches_session_sutx', JSON.stringify(tachesRealiseesSession));
+                afficherToast('❌ Tâche décochée');
+            } else {
+                verifierEtOuvrirSousTravaux(rowId);
+            }
         });
 
         const titre = document.createElement('div');
@@ -1129,6 +1141,89 @@ function rafraichirAffichageTaches() {
     sectionTachesSupport.classList.remove('hidden');
     sectionActionsRapides.classList.remove('hidden');
     sectionFiltreTaches.classList.remove('hidden');
+}
+
+/* ========================================================= */
+/* GESTION AJOUT TÂCHE MANUELLE (TRAVAIL NON PRÉVU)          */
+/* ========================================================= */
+
+function ouvrirModalAjoutTache() {
+    const selectTache = document.getElementById('selectTacheExistante');
+    selectTache.innerHTML = '<option value="">-- Choisir une tâche existante ou saisir ci-dessous --</option>';
+    
+    // Récupérer la liste sans doublons de toutes les tâches de toute la table
+    const tachesUniques = [...new Set(rawData.map(r => r.Tache).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    tachesUniques.forEach(t => {
+        selectTache.add(new Option(t, t));
+    });
+
+    document.getElementById('inputNouvelleTache').value = '';
+    document.getElementById('selectTypeNouvelleTache').value = 'pose';
+    ouvrirModal('divAjoutTacheModal');
+}
+
+function choisirTacheExistante() {
+    const val = document.getElementById('selectTacheExistante').value;
+    if (val) {
+        document.getElementById('inputNouvelleTache').value = val;
+        // Retrouver le type associé si possible
+        const trouve = rawData.find(r => r.Tache === val);
+        if (trouve && trouve.type) {
+            document.getElementById('selectTypeNouvelleTache').value = cleChapitre(trouve);
+        }
+    }
+}
+
+async function validerAjoutTacheManuelle() {
+    const chantier = selectChantier.value;
+    const support = selectSupport.value;
+    const type = document.getElementById('selectTypeNouvelleTache').value;
+    const intitule = document.getElementById('inputNouvelleTache').value.trim();
+
+    if (!chantier || !support) {
+        alert("Veuillez sélectionner un chantier et un support.");
+        return;
+    }
+    if (!intitule) {
+        alert("Veuillez saisir ou sélectionner l'intitulé de la tâche.");
+        return;
+    }
+
+    fermerModal('divAjoutTacheModal');
+
+    const nouvelleLigne = {
+        id: 'cust_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+        Chantier: chantier,
+        Support: support,
+        type: type,
+        Tache: intitule,
+        Fait: true,
+        etat: 'TERMINE',
+        isCustom: true,
+        _insertionLocale: true,
+        nom: userName,
+        prenom: userPrenom
+    };
+
+    rawData.push(nouvelleLigne);
+    sauvegarderCacheLocal();
+
+    const strId = String(nouvelleLigne.id);
+    if (!tachesRealiseesSession.includes(strId)) {
+        tachesRealiseesSession.push(strId);
+        localStorage.setItem('taches_session_sutx', JSON.stringify(tachesRealiseesSession));
+    }
+
+    rafraichirAffichageTaches();
+    afficherToast('✅ Tâche non prévue ajoutée');
+
+    if (estEnLigne) {
+        try {
+            await supabaseClient.from(TABLE_SUPABASE).insert([nouvelleLigne]);
+        } catch (e) {
+            logDiag("Erreur synchro insert custom : " + e.message);
+        }
+    }
 }
 
 /* ========================================================= */
@@ -1315,7 +1410,6 @@ function ouvrirEtatTache(id) {
     document.getElementById('etatDesax').value = parts[0] ?? '';
     document.getElementById('etatDesax2').value = parts[1] ?? '';
 
-    // Gestion des pendules provisoires dans la modale
     const secProv = document.getElementById('etatSecProv');
     if (isPendulage) {
         secProv.classList.remove('hidden');
@@ -1436,25 +1530,14 @@ async function validerEtatComplet() {
 
     fermerEtat();
     await modifierLigneMulti(id, champs);
-    afficherToast('✅ Enregistré');
-}
-
-async function modifierLigne(id, champ, valeur) {
-    const index = trouverIndexParId(id);
-    if (index < 0) return;
-    const updateData = { [champ]: valeur, nom: userName, prenom: userPrenom };
-    if (champ === 'Fait') updateData.date_fait = valeur ? dateDuPoste() : null;
-
-    Object.assign(rawData[index], updateData);
-    rawData[index].modifie = true;
-    sauvegarderCacheLocal();
-    rafraichirAffichageTaches();
-
-    if (estEnLigne) {
-        try {
-            await supabaseClient.from(TABLE_SUPABASE).update(updateData).eq('id', id);
-        } catch (e) {}
+    
+    const strId = String(id);
+    if (!tachesRealiseesSession.includes(strId)) {
+        tachesRealiseesSession.push(strId);
+        localStorage.setItem('taches_session_sutx', JSON.stringify(tachesRealiseesSession));
     }
+    
+    afficherToast('✅ Enregistré');
 }
 
 async function modifierLigneMulti(id, champs) {
@@ -1479,21 +1562,184 @@ function sauvegarderCacheLocal() {
     try { localStorage.setItem(CACHE_KEY, JSON.stringify(rawData)); } catch (e) {}
 }
 
-async function verifierEtSynchroniserFileAttente() {}
+/* ========================================================= */
+/* FONCTIONS EXPORT PDF & COPIE DE SESSION (AVEC RESET)      */
+/* ========================================================= */
+
+function actionCopierDepuisMenu() {
+    fermerToutesSidebars();
+    const chantier = selectChantier.value || 'Général';
+    
+    const lignesSession = rawData.filter(r => tachesRealiseesSession.includes(String(r.id)));
+    
+    if (lignesSession.length === 0) {
+        alert("ℹ️ Aucune nouvelle tâche réalisée dans cette session.");
+        return;
+    }
+
+    let texte = `📋 Récapitulatif Session — Chantier : ${chantier} (${new Date().toLocaleDateString()})\n\n`;
+    
+    const parSupport = {};
+    lignesSession.forEach(r => {
+        (parSupport[r.Support] = parSupport[r.Support] || []).push(r);
+    });
+
+    Object.keys(parSupport).forEach(support => {
+        texte += `📍 Support : ${support}\n`;
+        parSupport[support].forEach(t => {
+            texte += `  - [${t.Support}] ${t.Tache} (${t.etat || 'TERMINE'})\n`;
+            if (t.Observation) texte += `    Obs: ${t.Observation}\n`;
+        });
+        texte += `\n`;
+    });
+
+    navigator.clipboard.writeText(texte).then(() => {
+        alert("✅ Récapitulatif de la session copié dans le presse-papier !");
+        tachesRealiseesSession = [];
+        localStorage.removeItem('taches_session_sutx');
+        rafraichirAffichageTaches();
+    }).catch(err => {
+        alert("❌ Erreur lors de la copie : " + err);
+    });
+}
+
+function actionPartagerPDFDepuisMenu() {
+    fermerToutesSidebars();
+    genererEtPartagerPDFSession();
+}
+
+function genererEtPartagerPDFSession() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const chantier = selectChantier.value || 'Général';
+    
+    const lignesSession = rawData.filter(r => tachesRealiseesSession.includes(String(r.id)));
+
+    if (lignesSession.length === 0) {
+        alert("ℹ️ Aucune tâche réalisée dans cette session à exporter en PDF.");
+        return;
+    }
+
+    doc.setFontSize(16);
+    doc.setTextColor(37, 99, 235);
+    doc.text(`Rapport de Session - SUTX`, 14, 20);
+    
+    doc.setFontSize(11);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Chantier : ${chantier} | Date : ${new Date().toLocaleDateString()} | Opérateur : ${userName} ${userPrenom}`, 14, 28);
+
+    const dataTable = [];
+    lignesSession.forEach(t => {
+        dataTable.push([
+            t.Support || '',
+            t.type || '',
+            t.Tache || '',
+            t.etat || 'TERMINE',
+            t.Observation || ''
+        ]);
+    });
+
+    doc.autoTable({
+        startY: 35,
+        head: [['Support', 'Chapitre', 'Tâche', 'État', 'Observation']],
+        body: dataTable,
+        theme: 'grid',
+        headStyles: { fillColor: [37, 99, 235] },
+        styles: { fontSize: 9 }
+    });
+
+    const pdfBlob = doc.output('blob');
+    const nomFichier = `Rapport_Session_${chantier}_${new Date().toISOString().slice(0,10)}.pdf`;
+
+    if (navigator.canShare && navigator.canShare({ files: [new File([pdfBlob], nomFichier, { type: 'application/pdf' })] })) {
+        navigator.share({
+            files: [new File([pdfBlob], nomFichier, { type: 'application/pdf' })],
+            title: 'Rapport de Session SUTX',
+            text: `Rapport pour le chantier ${chantier}`
+        }).then(() => {
+            tachesRealiseesSession = [];
+            localStorage.removeItem('taches_session_sutx');
+            rafraichirAffichageTaches();
+        }).catch(() => {});
+    } else {
+        doc.save(nomFichier);
+        alert("📄 PDF téléchargé avec succès !");
+        tachesRealiseesSession = [];
+        localStorage.removeItem('taches_session_sutx');
+        rafraichirAffichageTaches();
+    }
+}
+
+function partagerPDFAvancement() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const chantier = selectChantier.value || 'Général';
+    
+    const lignesChantier = rawData.filter(r => r.Chantier === chantier);
+    if (lignesChantier.length === 0) {
+        alert("ℹ️ Aucune donnée pour ce chantier.");
+        return;
+    }
+
+    doc.setFontSize(16);
+    doc.setTextColor(37, 99, 235);
+    doc.text(`Avancement Global - ${chantier}`, 14, 20);
+
+    const dataTable = [];
+    lignesChantier.forEach(t => {
+        dataTable.push([
+            t.Support || '',
+            t.type || '',
+            t.Tache || '',
+            estFait(t) ? 'Terminé' : (t.etat || 'À faire')
+        ]);
+    });
+
+    doc.autoTable({
+        startY: 28,
+        head: [['Support', 'Chapitre', 'Tâche', 'État']],
+        body: dataTable,
+        theme: 'grid',
+        headStyles: { fillColor: [37, 99, 235] },
+        styles: { fontSize: 9 }
+    });
+
+    const pdfBlob = doc.output('blob');
+    const nomFichier = `Avancement_${chantier}.pdf`;
+
+    if (navigator.canShare && navigator.canShare({ files: [new File([pdfBlob], nomFichier, { type: 'application/pdf' })] })) {
+        navigator.share({
+            files: [new File([pdfBlob], nomFichier, { type: 'application/pdf' })],
+            title: 'Avancement Chantier SUTX',
+            text: `Avancement du chantier ${chantier}`
+        }).catch(() => {});
+    } else {
+        doc.save(nomFichier);
+        alert("📄 PDF d'avancement téléchargé !");
+    }
+}
+
+function construireVueAdminHierarchique() {
+    const conteneur = document.getElementById('conteneurAdminHierarchique');
+    if (!conteneur) return;
+    conteneur.innerHTML = '';
+    
+    const chantiers = [...new Set(rawData.map(r => r.Chantier).filter(Boolean))];
+    chantiers.forEach(ch => {
+        const lignesCh = rawData.filter(r => r.Chantier === ch);
+        const faitesCh = lignesCh.filter(estFait).length;
+        
+        const card = document.createElement('div');
+        card.className = 'border rounded-xl p-4 bg-white shadow-sm';
+        card.innerHTML = `<h3 class="font-bold text-base text-blue-800 mb-1">🏗️ ${escHtml(ch)}</h3><p class="text-xs text-gray-500">${faitesCh} / ${lignesCh.length} tâches réalisées au total</p>`;
+        conteneur.appendChild(card);
+    });
+}
+
 function estFait(r) { return ['vrai', 'true', '1'].includes(String(r.Fait).toLowerCase().trim()); }
 function escHtml(t) { return String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 function ncOuverte(item) { return item.conforme === false && item.nc_levee !== true; }
 function etatEffectif(r) { return estFait(r) ? 'TERMINE' : (r.etat && r.etat !== 'TERMINE') ? r.etat : null; }
-function verifierParametresURLAuDemarrage() {}
-function cocherToutSupport() {}
-function partagerPDFAvancement() {}
-function genererEtPartagerPDF() {}
-function actionCopierDepuisMenu() {}
-function actionPartagerPDFDepuisMenu() {}
-function executerActionEnAttente() {}
-function ouvrirModalAjoutTache() {}
-function validerAjoutTacheManuelle() {}
-function choisirTacheExistante() {}
 </script>
 
 </body>
