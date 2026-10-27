@@ -1378,51 +1378,109 @@ function choisirTacheExistante() {
 }
 
 async function validerAjoutTacheManuelle() {
+
+    const intitule = document.getElementById('inputNouvelleTache').value.trim();
+    const typeChoisi = document.getElementById('selectTypeNouvelleTache').value;
+
+    if (!intitule) {
+        alert("Veuillez saisir ou choisir un intitulé.");
+        return;
+    }
+
     const chantier = selectChantier.value;
     const support = selectSupport.value;
-    const type = document.getElementById('selectTypeNouvelleTache').value;
-    const intitule = document.getElementById('inputNouvelleTache').value.trim();
 
-    if (!chantier || !support) {
-        alert("Veuillez sélectionner un chantier et un support.");
+    // 1. VÉRIFICATION ANTI-DOUBLON : Est-ce que cette tâche existe déjà sur ce support ?
+    const existante = rawData.find(r =>
+        r.Chantier === chantier &&
+        r.Support === support &&
+        cleChapitre(r) === cleChapitre({ type: typeChoisi }) &&
+        normaliserTexte(r.Tache).trim() === normaliserTexte(intitule).trim()
+    );
+
+    if (existante) {
+        // Si elle existe déjà, on NE CRÉE PAS de doublon : on met simplement à jour la ligne existante
+        fermerModal('divAjoutTacheModal');
+        
+        await modifierLigneMulti(existante.id, {
+            Fait: true,
+            date_fait: dateDuPoste(),
+            Observation: (existante.Observation ? existante.Observation + ' | ' : '') + "Validé via travail non prévu",
+            modifie: true
+        });
+
+        chapitresOuverts.add(`${chantier}||${support}||${cleChapitre(existante)}`);
+        ongletTaches = 'faits';
+        rafraichirAffichageTaches();
+        
+        afficherToast("ℹ️ Cette tâche existait déjà : elle a été mise à jour sans doublon.");
         return;
     }
-    if (!intitule) {
-        alert("Veuillez saisir ou sélectionner l'intitulé de la tâche.");
-        return;
-    }
 
-    fermerModal('divAjoutTacheModal');
-
+    // 2. Si elle n'existe pas, on procède à l'insertion normale
     const nouvelleLigne = {
-        id: 'cust_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
         Chantier: chantier,
         Support: support,
-        type: type,
         Tache: intitule,
+        type: typeChoisi,
         Fait: true,
-        etat: 'TERMINE',
         date_fait: dateDuPoste(),
-        isCustom: true,
-        _insertionLocale: true,
+        Observation: "Travail non prévu ajouté manuellement",
         nom: userName,
-        prenom: userPrenom
+        prenom: userPrenom,
+        isCustom: true,
+        modifie: true
     };
+
+    if (estEnLigne) {
+        try {
+            const { data, error } =
+                await supabaseClient
+                    .from(TABLE_SUPABASE)
+                    .insert([{
+                        Chantier: nouvelleLigne.Chantier,
+                        Support: nouvelleLigne.Support,
+                        Tache: nouvelleLigne.Tache,
+                        type: nouvelleLigne.type,
+                        Fait: nouvelleLigne.Fait,
+                        date_fait: nouvelleLigne.date_fait,
+                        Observation: nouvelleLigne.Observation,
+                        nom: nouvelleLigne.nom,
+                        prenom: nouvelleLigne.prenom
+                    }])
+                    .select('*');
+
+            if (error) throw error;
+
+            if (!data || data.length !== 1) {
+                throw new Error("Insertion non confirmée.");
+            }
+
+            Object.assign(nouvelleLigne, data[0]);
+            nouvelleLigne.isCustom = true;
+            nouvelleLigne.modifie = true;
+
+        } catch (err) {
+            console.error(err);
+            logDiag(`❌ Insertion impossible : ${err.message || err}`);
+            nouvelleLigne._insertionLocale = true;
+            enregistrerInsertionFileAttente(nouvelleLigne);
+        }
+    } else {
+        nouvelleLigne._insertionLocale = true;
+        enregistrerInsertionFileAttente(nouvelleLigne);
+    }
 
     rawData.push(nouvelleLigne);
     sauvegarderCacheLocal();
+    fermerModal('divAjoutTacheModal');
 
-    const strId = String(nouvelleLigne.id);
-    if (!tachesRealiseesSession.includes(strId)) {
-        tachesRealiseesSession.push(strId);
-        localStorage.setItem('taches_session_sutx', JSON.stringify(tachesRealiseesSession));
-    }
-
+    chapitresOuverts.add(
+        `${chantier}||${support}||${cleChapitre(nouvelleLigne)}`
+    );
+    ongletTaches = 'faits';
     rafraichirAffichageTaches();
-    afficherToast('✅ Tâche non prévue ajoutée');
-
-    mettreEnFileInsert(nouvelleLigne);
-    if (estEnLigne) synchroniserFile();
+    afficherToast("✅ Travail non prévu ajouté avec succès.");
 }
 
 /* ========================================================= */
