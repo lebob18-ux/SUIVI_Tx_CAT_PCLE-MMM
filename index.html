@@ -1827,8 +1827,10 @@ async function validerEtatComplet() {
     const champs = {};
 
     if (isPendulage) {
-        champs.pendules_provisoires_poses = parseInt(document.getElementById('etatProv').value, 10) || 0;
-        champs.pendules_provisoires_deposes = parseInt(document.getElementById('etatProvDep').value, 10) || 0;
+        const prov = document.getElementById('etatProv').value.trim();
+        const provDep = document.getElementById('etatProvDep').value.trim();
+        if (prov !== '') champs.pendules_provisoires_poses = parseInt(prov, 10) || 0;
+        if (provDep !== '') champs.pendules_provisoires_deposes = parseInt(provDep, 10) || 0;
     }
 
     if (etatChoisi === 'TERMINE') {
@@ -1884,8 +1886,27 @@ async function validerEtatComplet() {
 async function modifierLigneMulti(id, champs) {
     const index = trouverIndexParId(id);
     if (index < 0) return;
-    const updateData = { ...champs, nom: userName, prenom: userPrenom };
-    if ('Fait' in champs) updateData.date_fait = champs.Fait ? dateDuPoste() : null;
+    const ligne = rawData[index];
+
+    const vide = v => v === null || v === undefined || v === '';
+    const identique = (a, b) => (vide(a) && vide(b)) || String(a) === String(b);
+
+    // 1) on ne garde que les valeurs qui changent vraiment
+    const updateData = {};
+    Object.keys(champs).forEach(k => {
+        if (!identique(champs[k], ligne[k])) updateData[k] = champs[k];
+    });
+    if (!Object.keys(updateData).length) return;   // rien de nouveau : on ne touche à rien
+
+    // 2) auteur + date : seulement quand l'état Fait change (ou si jamais renseignés)
+    if ('Fait' in updateData) {
+        updateData.date_fait = updateData.Fait ? dateDuPoste() : null;
+        updateData.nom = userName;
+        updateData.prenom = userPrenom;
+    } else if (vide(ligne.nom) && vide(ligne.prenom)) {
+        updateData.nom = userName;
+        updateData.prenom = userPrenom;
+    }
 
     Object.assign(rawData[index], updateData);
     rawData[index].modifie = true;
